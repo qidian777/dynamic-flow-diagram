@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>动态流程图 · 模板</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --panel:#fff; --line:#e3e8f0; --line-soft:#eef2f7;
+    --ink:#1b2434; --ink2:#4a5568; --mute:#8b95a8;
+    --brand:#2563eb; --shadow:0 6px 22px rgba(23,32,47,.09);
+    --lane1:#f4f7fd; --lane2:#eef3fa; --lane3:#f4f7fd;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--ink); overflow:hidden;
+    font:400 13px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+
+  /* ---------- 页头 ---------- */
+  header{
+    position:fixed; inset:0 0 auto 0; height:64px; z-index:40;
+    display:flex; align-items:center; gap:14px; padding:0 22px;
+    background:rgba(255,255,255,.94); backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex; align-items:center; gap:9px; font-size:14px; font-weight:650}
+  .dot{width:7px;height:7px;border-radius:50%;background:#16a34a}
+  .brand .sub{font-size:11px;color:var(--mute);font-weight:400}
+  .tabs{display:flex; gap:4px; margin-left:auto; background:#f1f4f9; padding:3px; border-radius:9px}
+  .tabs button{
+    border:0; background:transparent; font:inherit; font-size:12px; color:var(--ink2);
+    padding:6px 11px; border-radius:7px; cursor:pointer; white-space:nowrap;
+  }
+  .tabs button.on{background:#fff; color:var(--brand); font-weight:600; box-shadow:0 1px 4px rgba(23,32,47,.1)}
+  .btn{
+    border:1px solid var(--line); background:#fff; font:inherit; font-size:12px; color:var(--ink2);
+    padding:7px 13px; border-radius:9px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn:hover{border-color:#c9d3e2}
+  .btn.primary{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .btn svg{width:13px;height:13px}
+
+  /* ---------- 冻结泳道条 ---------- */
+  #laneBar{
+    position:fixed; left:0; right:0; top:64px; height:34px; z-index:35;
+    background:rgba(255,255,255,.95); border-bottom:1px solid var(--line);
+    overflow:hidden; pointer-events:none;
+  }
+  #laneBar i{
+    position:absolute; top:0; height:34px; display:flex; align-items:center; justify-content:center;
+    font-size:11.5px; font-weight:650; font-style:normal; letter-spacing:.4px;
+    border-right:1px solid rgba(0,0,0,.05);
+  }
+
+  /* ---------- 画布 ---------- */
+  #viewport{position:fixed; inset:98px 0 0 0; overflow:hidden; cursor:grab}
+  #viewport.dragging{cursor:grabbing}
+  #viewport.on{right:372px}
+  #stage{position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform}
+  #canvas{position:relative}
+  #wires{position:absolute; inset:0; overflow:visible; pointer-events:none}
+  #wires path{fill:none; stroke:#9aa8bd; stroke-width:1.5}
+  #wires path.live{stroke:#e11d48; stroke-width:2.2}
+  #wires path.hot{stroke:#2563eb; stroke-width:2}
+  #wires path.dim{opacity:.15}
+  .elabel{
+    position:absolute; transform:translate(-50%,-50%); z-index:4;
+    font-size:10px; color:#7b879b; background:rgba(255,255,255,.92);
+    padding:1px 5px; border-radius:5px; pointer-events:none;
+  }
+
+  /* ---------- 阶段色带 ---------- */
+  .band{position:absolute; pointer-events:none; border-radius:6px}
+  .band b{
+    position:absolute; left:0; top:0; transform:translateY(-100%);
+    font-size:11px; color:#93a0b4; font-weight:600; letter-spacing:.5px; padding-bottom:4px;
+  }
+  .lane{position:absolute; top:0; bottom:0; pointer-events:none}
+
+  /* ---------- 节点（标准流程图图形） ---------- */
+  .node{position:absolute; width:206px; cursor:grab; user-select:none; z-index:5; transition:opacity .3s,filter .18s}
+  .node .shp{position:absolute; inset:0; width:100%; height:100%; overflow:visible}
+  .node .shp *{stroke-width:1.4; transition:stroke .15s, fill .15s}
+  .node .txt{
+    position:relative; z-index:2; height:100%; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:0 16px; gap:2px;
+  }
+  .node .t{font-size:12.5px; line-height:1.36; font-weight:550; color:var(--ink)}
+  .node .m{font-size:10px; color:var(--mute); line-height:1.25}
+  .node .idx{
+    position:absolute; left:0; top:50%; transform:translate(-50%,-50%); z-index:3;
+    min-width:19px; height:19px; padding:0 5px; border-radius:10px; background:var(--ink); color:#fff;
+    font-size:10.5px; font-weight:700; display:flex; align-items:center; justify-content:center;
+  }
+  .node.t-start .shp rect{fill:#e9f7ef; stroke:#5ba97f}
+  .node.t-start .t{color:#14532d; font-weight:600}
+  .node.t-start .idx{background:#14532d}
+  .node.t-proc .shp rect{fill:#fff; stroke:#9aa8bd}
+  .node.t-dec .shp polygon{fill:#fff9e8; stroke:#dfa733}
+  .node.t-dec .txt{padding:0 34px}
+  .node.t-dec .t{font-size:11.8px; color:#7a4a08; font-weight:600}
+  .node.t-dec .m{display:none}
+  .node.t-data .shp polygon{fill:#eaf3fd; stroke:#5b8fd6}
+  .node.t-db .shp path,.node.t-db .shp ellipse{fill:#f5f0fd; stroke:#8b6fc4}
+  .node.t-sub .shp rect{fill:#f6f8fc; stroke:#7d8ba1}
+  .node.t-sub .shp line{stroke:#7d8ba1; stroke-width:1.2}
+  .node.t-err .shp rect{fill:#fdeff2; stroke:#d0667c}
+  .node.t-err .t{color:#8a1f34}
+  .node:hover{filter:drop-shadow(0 5px 13px rgba(23,32,47,.14)); z-index:9}
+  .node.ghost{opacity:.14; pointer-events:none; filter:saturate(.15)}
+  .node.sel{z-index:18; filter:drop-shadow(0 8px 18px rgba(15,23,42,.2))}
+  .node.sel .shp rect,.node.sel .shp polygon,.node.sel .shp path,.node.sel .shp ellipse{stroke:#0f172a; stroke-width:2}
+  .node.playing{z-index:20; filter:drop-shadow(0 8px 20px rgba(225,29,72,.32))}
+  .node.playing .shp rect,.node.playing .shp polygon,.node.playing .shp path,.node.playing .shp ellipse{stroke:#e11d48; stroke-width:2.2}
+
+  /* ---------- 悬停气泡（左右侧 + 避让） ---------- */
+  #tip{
+    position:fixed; z-index:56; max-width:300px; background:#fff; border:1px solid var(--line);
+    border-radius:11px; box-shadow:0 12px 34px rgba(16,24,38,.18); padding:11px 13px 10px;
+    pointer-events:none; opacity:0; transition:opacity .15s;
+  }
+  #tip.on{opacity:1}
+  .tip-h{font-size:12.5px; font-weight:650; line-height:1.45; display:flex; gap:6px; align-items:baseline}
+  .tip-no{flex:none; background:var(--ink); color:#fff; font-size:10px; font-weight:700; padding:1.5px 6px; border-radius:6px}
+  .tip-m{display:flex; gap:6px; align-items:center; font-size:10.5px; color:var(--mute); margin:6px 0 7px; flex-wrap:wrap}
+  .tip-b{font-size:11.5px; line-height:1.68; color:var(--ink2); border-top:1px dashed var(--line-soft); padding-top:7px}
+  .chip{font-size:10px; padding:1px 7px; border-radius:20px; background:#eef2fa; color:#41506b}
+
+  /* ---------- 抽屉 ---------- */
+  aside{
+    position:fixed; right:0; top:64px; bottom:0; width:372px; z-index:45;
+    background:var(--panel); border-left:1px solid var(--line); box-shadow:var(--shadow);
+    transform:translateX(100%); transition:transform .3s; overflow-y:auto; padding:20px 20px 40px;
+  }
+  aside.on{transform:none}
+  aside h2{font-size:16px; font-weight:650; line-height:1.4; margin:6px 0 12px}
+  .kick{font-size:10.5px; color:var(--brand); font-weight:650; letter-spacing:.6px; text-transform:uppercase}
+  .sec{margin-top:16px}
+  .sec h4{font-size:11px; color:var(--mute); font-weight:600; letter-spacing:.5px; margin-bottom:6px}
+  .sec p{font-size:12px; line-height:1.75; color:var(--ink2)}
+  .rel{display:flex; flex-direction:column; gap:4px}
+  .rel button{
+    text-align:left; border:1px solid var(--line); background:#fafbfd; font:inherit; font-size:11.5px;
+    color:var(--ink2); padding:6px 9px; border-radius:8px; cursor:pointer;
+  }
+  .rel button:hover{border-color:#c3d0e4; color:var(--brand)}
+  #close{position:absolute; right:16px; top:16px; border:0; background:#f2f5fa; width:26px; height:26px;
+    border-radius:8px; cursor:pointer; color:var(--mute); font-size:15px; line-height:1}
+
+  /* ---------- 图例 / 提示 ---------- */
+  .legend{
+    position:fixed; right:22px; bottom:18px; z-index:30; display:flex; gap:14px; flex-wrap:wrap;
+    background:rgba(255,255,255,.92); border:1px solid var(--line); border-radius:11px;
+    padding:8px 13px; font-size:11px; color:var(--ink2); box-shadow:var(--shadow);
+  }
+  .legend span{display:inline-flex; align-items:center; gap:5px}
+  .toast{
+    position:fixed; left:50%; top:78px; transform:translate(-50%,-12px); z-index:60;
+    background:rgba(23,32,47,.94); color:#fff; font-size:12.5px; padding:9px 16px; border-radius:24px;
+    opacity:0; pointer-events:none; transition:.28s;
+  }
+  .toast.on{opacity:1; transform:translate(-50%,0)}
+  @media (max-width:900px){
+    aside{width:100%}
+    #viewport.on{right:0}
+    .legend{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="dot"></span>流程名称
+    <span class="sub">数据来源 · 版本</span>
+  </div>
+  <nav class="tabs" id="tabs"></nav>
+  <button class="btn" id="fit">适应窗口</button>
+  <button class="btn primary" id="play">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>流程演示
+  </button>
+</header>
+
+<div id="laneBar"></div>
+
+<div id="viewport">
+  <div id="stage"><div id="canvas">
+    <svg id="wires" width="1400" height="800"></svg>
+  </div></div>
+</div>
+
+<div id="tip"></div>
+<div class="toast" id="toast"></div>
+
+<aside id="drawer">
+  <button id="close">×</button>
+  <div class="kick" id="drKick"></div>
+  <h2 id="drTitle"></h2>
+  <div id="drBody"></div>
+</aside>
+
+<div class="legend">
+  <span><svg width="18" height="11" viewBox="0 0 18 11"><rect x="1" y="1" width="16" height="9" rx="4.5" fill="#e9f7ef" stroke="#5ba97f"/></svg>起止</span>
+  <span><svg width="18" height="11" viewBox="0 0 18 11"><rect x="1" y="1" width="16" height="9" fill="#fff" stroke="#9aa8bd"/></svg>作业</span>
+  <span><svg width="18" height="11" viewBox="0 0 18 11"><polygon points="9,1 17,5.5 9,10 1,5.5" fill="#fff9e8" stroke="#dfa733"/></svg>判断</span>
+  <span><svg width="18" height="11" viewBox="0 0 18 11"><polygon points="4,1 17,1 14,10 1,10" fill="#eaf3fd" stroke="#5b8fd6"/></svg>数据</span>
+  <span><svg width="18" height="11" viewBox="0 0 18 11"><path d="M1,3 L1,8 A8,3 0 0 0 17,8 L17,3" fill="#f5f0fd" stroke="#8b6fc4"/><ellipse cx="9" cy="3" rx="8" ry="2.4" fill="#f5f0fd" stroke="#8b6fc4"/></svg>系统</span>
+  <span><svg width="18" height="11" viewBox="0 0 18 11"><rect x="1" y="1" width="16" height="9" fill="#f6f8fc" stroke="#7d8ba1"/><line x1="4" y1="1" x2="4" y2="10" stroke="#7d8ba1"/><line x1="14" y1="1" x2="14" y2="10" stroke="#7d8ba1"/></svg>子流程</span>
+</div>
+
+<script>
+/* =========================================================
+   1. 数据层 —— 只改这一段就能用
+   ========================================================= */
+const PHASES = [
+  {id:'p1', name:'① 受理', from:0,    to:340,  color:'#eff6ff'},
+  {id:'p2', name:'② 处理', from:340,  to:760,  color:'#f5f3ff'},
+];
+const LANES = [
+  {k:'biz',  name:'业务',       x:60,  w:420},
+  {k:'ops',  name:'运营',       x:480, w:400},
+  {k:'it',   name:'IT',         x:880, w:340},
+];
+const LANE_COLOR = {biz:'#f4f7fd', ops:'#eef3fa', it:'#f4f7fd'};
+const LANE_TINT  = {biz:'#dbe6f6', ops:'#d6e2f3', it:'#dbe6f6'};
+
+/* type: start | proc | dec | data | db | sub | err */
+const NODES = [
+  {id:'a1', n:'1', p:'p1', lane:'biz', x:270, y:90,  type:'start', t:'客户提交申请', role:'业务', sys:'—', note:'流程触发点：客户线上提交，销售确认受理。'},
+  {id:'a2', n:'2', p:'p1', lane:'biz', x:270, y:210, type:'proc',  t:'业务初审材料', role:'业务', sys:'CRM', note:'核对营业执照、联系人、需求描述是否齐全。缺件在此退回。'},
+  {id:'a3', n:'3', p:'p1', lane:'biz', x:270, y:320, type:'dec',   t:'材料是否齐全？', role:'业务', sys:'—', note:'不齐全退回客户补件，齐全流转到运营。'},
+  {id:'a4', n:'4', p:'p1', lane:'ops', x:680, y:440, type:'proc',  t:'运营排期评估', role:'运营', sys:'工单系统', note:'按产能与优先级给出交付日期，写入工单。'},
+  {id:'a5', n:'5', p:'p2', lane:'ops', x:680, y:560, type:'db',    t:'工单系统建档', role:'运营', sys:'工单系统', note:'生成工单号，后续所有动作都挂在这个号下。'},
+  {id:'a6', n:'6', p:'p2', lane:'it',  x:1050,y:560, type:'sub',   t:'按《开通流程》执行', role:'IT', sys:'—', note:'引用另一张流程图，此处不展开。'},
+  {id:'a7', n:'7', p:'p2', lane:'ops', x:680, y:680, type:'data',  t:'输出交付单', role:'运营', sys:'工单系统', note:'交付单是后续对账依据，必须归档。'},
+  {id:'a8', n:'8', p:'p2', lane:'biz', x:270, y:680, type:'start', t:'流程结束', role:'业务', sys:'—', note:'归档完成后流程结束。'},
+];
+const EDGES = [
+  {f:'a1',t:'a2',l:''}, {f:'a2',t:'a3',l:''},
+  {f:'a3',t:'a4',l:'是'}, {f:'a3',t:'a2',l:'否'},
+  {f:'a4',t:'a5',l:''}, {f:'a5',t:'a6',l:''},
+  {f:'a5',t:'a7',l:''}, {f:'a7',t:'a8',l:''},
+];
+/* 演示顺序（按阶段给出节点 id 序列） */
+const SEQ = [
+  ['p1',['a1','a2','a3','a4']],
+  ['p2',['a5','a6','a7','a8']],
+];
+
+/* =========================================================
+   2. 渲染
+   ========================================================= */
+const NW = 206, NH = 56;
+const NHT = {dec:96};
+const nh = n => NHT[n.type] || NH;
+const NMAP = Object.fromEntries(NODES.map(n=>[n.id,n]));
+const dom = {};
+
+const canvas = document.getElementById('canvas');
+const wires  = document.getElementById('wires');
+const stage  = document.getElementById('stage');
+const vp     = document.getElementById('viewport');
+
+function shapeSVG(n){
+  const W=NW, H=nh(n);
+  const o = `<svg class="shp" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">`;
+  switch(n.type){
+    case 'start': return `${o}<rect x="1" y="1" width="${W-2}" height="${H-2}" rx="${(H-2)/2}"/></svg>`;
+    case 'dec':   return `${o}<polygon points="${W/2},1.5 ${W-1.5},${H/2} ${W/2},${H-1.5} 1.5,${H/2}"/></svg>`;
+    case 'data':  return `${o}<polygon points="24,1.5 ${W-1.5},1.5 ${W-24},${H-1.5} 1.5,${H-1.5}"/></svg>`;
+    case 'db':    return `${o}<path d="M1.5,10 L1.5,${H-10} A${W/2-1.5},9 0 0 0 ${W-1.5},${H-10} L${W-1.5},10"/>`+
+                         `<ellipse cx="${W/2}" cy="10" rx="${W/2-1.5}" ry="9"/></svg>`;
+    case 'sub':   return `${o}<rect x="1.5" y="1.5" width="${W-3}" height="${H-3}"/>`+
+                         `<line x1="13" y1="1.5" x2="13" y2="${H-1.5}"/><line x1="${W-13}" y1="1.5" x2="${W-13}" y2="${H-1.5}"/></svg>`;
+    default:      return `${o}<rect x="1.5" y="1.5" width="${W-3}" height="${H-3}" rx="2"/></svg>`;
+  }
+}
+
+/* 泳道底色 + 阶段色带 */
+LANES.forEach((ln,i)=>{
+  const d=document.createElement('div');
+  d.className='lane';
+  d.style.cssText=`left:${ln.x}px;width:${ln.w}px;background:${LANE_COLOR[ln.k]}`;
+  canvas.appendChild(d);
+});
+PHASES.forEach(p=>{
+  const b=document.createElement('div');
+  b.className='band';
+  b.style.cssText=`left:40px;right:40px;top:${p.from}px;height:${p.to-p.from}px;background:${p.color};opacity:.5`;
+  canvas.appendChild(b);
+});
+
+/* 节点 */
+NODES.forEach(n=>{
+  const el=document.createElement('div');
+  el.className='node t-'+n.type;
+  el.style.left=(n.x-NW/2)+'px';
+  el.style.top =(n.y-nh(n)/2)+'px';
+  el.style.height=nh(n)+'px';
+  el.innerHTML = shapeSVG(n)
+    + (n.n?`<span class="idx">${n.n}</span>`:'')
+    + `<div class="txt"><div class="t">${n.t}</div>`
+    + (n.sys&&n.sys!=='—'&&n.type!=='dec'&&n.type!=='start'?`<div class="m">${n.sys}</div>`:'')
+    + `</div>`;
+  canvas.appendChild(el);
+  dom[n.id]=el;
+  bindNode(n,el);
+});
+
+/* 连线 */
+const SVGNS='http://www.w3.org/2000/svg';
+function defs(){
+  const d=document.createElementNS(SVGNS,'defs');
+  [['ar','#9aa8bd'],['ar-hot','#2563eb'],['ar-live','#e11d48']].forEach(([id,c])=>{
+    const m=document.createElementNS(SVGNS,'marker');
+    m.setAttribute('id',id); m.setAttribute('viewBox','0 0 10 10');
+    m.setAttribute('refX','9'); m.setAttribute('refY','5');
+    m.setAttribute('markerWidth','7'); m.setAttribute('markerHeight','7');
+    m.setAttribute('orient','auto-start-reverse');
+    const p=document.createElementNS(SVGNS,'path');
+    p.setAttribute('d','M0,0 L10,5 L0,10 z'); p.setAttribute('fill',c);
+    m.appendChild(p); d.appendChild(m);
+  });
+  wires.appendChild(d);
+}
+defs();
+
+function pathOf(a,b){
+  const dx=b.x-a.x, dy=b.y-a.y;
+  const ah=nh(a), bh=nh(b);
+  if(Math.abs(dx)<30){
+    const s=dy>=0?1:-1;                     /* 向下从底部出、向上从顶部出，绝不穿过节点 */
+    const off=dy<0?34:0;                    /* 回退线（向上）右移，避免与正行线重叠 */
+    const ax=a.x+off, bx=b.x+off;
+    const y1=a.y+s*ah/2, y2=b.y-s*bh/2;
+    return `M${ax},${y1} C${ax},${y1+(y2-y1)*.45} ${bx},${y2-(y2-y1)*.45} ${bx},${y2}`;
+  }
+  if(Math.abs(dy)<24){
+    const sx=Math.sign(dx)||1;
+    const x1=a.x+NW/2*sx, x2=b.x-NW/2*sx;
+    return `M${x1},${a.y} C${x1+(x2-x1)*.45},${a.y} ${x2-(x2-x1)*.45},${b.y} ${x2},${b.y}`;
+  }
+  const y1=a.y+ah/2, ym=y1+26, y2=b.y-bh/2;
+  return `M${a.x},${y1} L${a.x},${ym-8} Q${a.x},${ym} ${a.x+8},${ym} L${b.x-8},${ym} Q${b.x},${ym} ${b.x},${ym+8} L${b.x},${y2}`;
+}
+
+function drawWires(){
+  [...wires.querySelectorAll('path,.elabel')].forEach(x=>x.remove());
+  EDGES.forEach(e=>{
+    const a=NMAP[e.f], b=NMAP[e.t];
+    if(!a||!b) return;
+    const p=document.createElementNS(SVGNS,'path');
+    p.setAttribute('d',pathOf(a,b));
+    p.setAttribute('marker-end','url(#ar)');
+    p.dataset.f=e.f; p.dataset.t=e.t;
+    wires.appendChild(p);
+    e._el=p;
+    if(e.l){
+      /* 标签贴在起点出口 1/3 处（方向随连线走向，回退线同步右移） */
+      const s=(b.y-a.y)>=0?1:-1;
+      const off=(b.y-a.y)<0?34:0;
+      const ax=a.x+off, ay=a.y+s*nh(a)/2;
+      const bx=b.x+off, by=b.y-s*nh(b)/2;
+      const lb=document.createElement('div');
+      lb.className='elabel'; lb.textContent=e.l;
+      lb.style.left=(ax+(bx-ax)*.32)+'px';
+      lb.style.top =(ay+(by-ay)*.32)+'px';
+      canvas.appendChild(lb); e._lb=lb;
+    }
+  });
+}
+drawWires();
+
+/* =========================================================
+   3. 变换（缩放/平移）
+   ========================================================= */
+let view={s:1,x:0,y:0};
+function apply(){
+  stage.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.s})`;
+  syncLaneBar();
+}
+function bounds(){
+  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
+  NODES.forEach(n=>{
+    if(dom[n.id].classList.contains('ghost')) return;
+    x1=Math.min(x1,n.x-NW/2); x2=Math.max(x2,n.x+NW/2);
+    y1=Math.min(y1,n.y-nh(n)/2); y2=Math.max(y2,n.y+nh(n)/2);
+  });
+  if(x1>x2) return {x:0,y:0,w:1200,h:600};
+  return {x:x1-40,y:y1-50,w:x2-x1+80,h:y2-y1+100};
+}
+function fitView(){
+  const b=bounds(), box=vp.getBoundingClientRect();
+  const s=Math.min(box.width/b.w, (box.height-30)/b.h, 1.15);
+  view.s=s;
+  view.x=(box.width-b.w*s)/2 - b.x*s;
+  view.y=(box.height-b.h*s)/2 + 14 - b.y*s;
+  apply();
+}
+function centerOn(id){
+  const n=NMAP[id]; if(!n) return;
+  const box=vp.getBoundingClientRect();
+  view.x=box.width/2 - n.x*view.s;
+  view.y=box.height/2 - n.y*view.s;
+  apply();
+}
+
+/* 冻结泳道条：横向跟随画布 */
+const laneBar=document.getElementById('laneBar');
+let laneNodes=[];
+LANES.forEach(ln=>{
+  const i=document.createElement('i');
+  i.textContent=ln.name;
+  i.style.background=LANE_TINT[ln.k];
+  i.style.color='#41506b';
+  laneBar.appendChild(i); laneNodes.push({el:i,ln});
+});
+function syncLaneBar(){
+  laneNodes.forEach(({el,ln})=>{
+    el.style.left=(view.x+ln.x*view.s)+'px';
+    el.style.width=(ln.w*view.s)+'px';
+    const f=Math.max(.55,Math.min(1,view.s));
+    el.style.fontSize=(11.5*f)+'px';
+    el.style.opacity=view.s<.28?0:1;
+  });
+}
+
+/* 滚轮缩放（以鼠标为锚点） */
+vp.addEventListener('wheel',ev=>{
+  ev.preventDefault();
+  const box=vp.getBoundingClientRect();
+  const mx=ev.clientX-box.left, my=ev.clientY-box.top;
+  const s2=Math.max(.18,Math.min(2.2, view.s*(ev.deltaY<0?1.09:1/1.09)));
+  view.x=mx-(mx-view.x)*(s2/view.s);
+  view.y=my-(my-view.y)*(s2/view.s);
+  view.s=s2; apply();
+},{passive:false});
+
+/* 平移 */
+let pan=null;
+vp.addEventListener('pointerdown',ev=>{
+  if(ev.target.closest('.node')) return;
+  pan={sx:ev.clientX,sy:ev.clientY,ox:view.x,oy:view.y};
+  vp.classList.add('dragging');
+});
+addEventListener('pointermove',ev=>{
+  if(!pan) return;
+  view.x=pan.ox+(ev.clientX-pan.sx);
+  view.y=pan.oy+(ev.clientY-pan.sy);
+  apply();
+});
+addEventListener('pointerup',()=>{pan=null;vp.classList.remove('dragging');});
+
+/* =========================================================
+   4. 节点交互：拖拽 / 悬停 / 点击
+   ========================================================= */
+function bindNode(n,el){
+  let drag=null, moved=false;
+  el.addEventListener('pointerdown',ev=>{
+    ev.stopPropagation();
+    drag={sx:ev.clientX,sy:ev.clientY,ox:n.x,oy:n.y};
+    moved=false; el.setPointerCapture(ev.pointerId);
+    el.style.cursor='grabbing'; el.style.zIndex=30;
+  });
+  el.addEventListener('pointermove',ev=>{
+    if(!drag) return;
+    const dx=(ev.clientX-drag.sx)/view.s, dy=(ev.clientY-drag.sy)/view.s;
+    if(Math.abs(dx)+Math.abs(dy)>3) moved=true;
+    n.x=drag.ox+dx; n.y=drag.oy+dy;
+    el.style.left=(n.x-NW/2)+'px';
+    el.style.top =(n.y-nh(n)/2)+'px';
+    drawWires();
+  });
+  el.addEventListener('pointerup',()=>{
+    if(!drag) return;
+    el.style.cursor='grab'; el.style.zIndex='';
+    const was=moved; drag=null;
+    if(!was) select(n.id);
+  });
+  el.addEventListener('pointerenter',()=>{ showTip(n); hotWires(n.id,true); });
+  el.addEventListener('pointerleave',()=>{ hideTip(); hotWires(n.id,false); });
+}
+
+const tip=document.getElementById('tip');
+function tipHTML(n){
+  return `<div class="tip-h">${n.n?`<span class="tip-no">${n.n}</span>`:''}${n.t}</div>
+    ${n.role||n.sys?`<div class="tip-m">${n.role?`<span class="chip">${n.role}</span>`:''}${n.sys&&n.sys!=='—'?`<span>· ${n.sys}</span>`:''}</div>`:''}
+    <div class="tip-b">${n.note}</div>`;
+}
+function showTip(n){
+  if(pan||playTimer) return;
+  tip.innerHTML=tipHTML(n);
+  tip.classList.add('on');
+  const r=dom[n.id].getBoundingClientRect();
+  const tw=tip.offsetWidth, th=tip.offsetHeight, gap=14;
+
+  /* ① 优先右侧，不足翻左侧 */
+  const roomR=innerWidth-(r.right+gap), roomL=r.left-gap;
+  let x;
+  if(roomR>=tw)            x=r.right+gap;
+  else if(roomL>=tw)       x=r.left-gap-tw;
+  else if(roomR>=roomL)    x=innerWidth-tw-10;
+  else                     x=10;
+
+  /* ② 垂直与节点居中（不放上下，避让流程方向） */
+  let y=r.top+r.height/2-th/2;
+  y=Math.max(64,Math.min(y,innerHeight-th-10));
+
+  /* ③ 与其他节点相交则沿垂直找最近空档 */
+  const others=[...document.querySelectorAll('.node:not(.ghost)')]
+    .map(e=>e.getBoundingClientRect())
+    .filter(o=>!(o.right<x-6||o.left>x+tw+6));
+  const hits=yy=>others.some(o=>{
+    const b={l:x,r:x+tw,t:yy,b:yy+th};
+    return b.l<o.right-4&&b.r>o.left+4&&b.t<o.bottom-4&&b.b>o.top+4;
+  });
+  if(hits(y)){
+    const y0=r.top+r.height/2-th/2, lo=innerHeight-th-10;
+    for(let off=18; off<lo; off+=18){
+      if(y0+off<=lo && !hits(y0+off)){ y=y0+off; break; }
+      if(y0-off>=64  && !hits(y0-off)){ y=y0-off; break; }
+    }
+    y=Math.max(64,Math.min(y,lo));
+  }
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+function hideTip(){ tip.classList.remove('on'); }
+
+function hotWires(id,on){
+  if(playTimer) return;
+  EDGES.forEach(e=>{
+    const hit=(e.f===id||e.t===id);
+    if(on){
+      if(hit){ e._el.classList.add('hot'); e._el.setAttribute('marker-end','url(#ar-hot)'); }
+      else e._el.classList.add('dim');
+    }else{
+      e._el.classList.remove('hot','dim');
+      e._el.setAttribute('marker-end','url(#ar)');
+    }
+  });
+}
+
+/* =========================================================
+   5. 详情抽屉
+   ========================================================= */
+const drawer=document.getElementById('drawer');
+function select(id){
+  const n=NMAP[id]; if(!n) return;
+  Object.values(dom).forEach(e=>e.classList.remove('sel'));
+  dom[id].classList.add('sel');
+  drawer.classList.add('on'); vp.classList.add('on');
+  document.getElementById('drKick').textContent=(PHASES.find(p=>p.id===n.p)?.name||'');
+  document.getElementById('drTitle').textContent=(n.n?n.n+'  ':'')+n.t;
+  const up=EDGES.filter(e=>e.t===id), down=EDGES.filter(e=>e.f===id);
+  const row=(arr,tag)=>arr.map(e=>{
+    const o=NMAP[tag==='up'?e.f:e.t];
+    return `<button data-goto="${o.id}">${tag==='up'?'←':'→'} ${o.n?o.n+' ':''}${o.t}${e.l?` <span style="color:#94a3b8">· ${e.l}</span>`:''}</button>`;
+  }).join('')||'<span style="font-size:12px;color:#a3adbf">无</span>';
+  document.getElementById('drBody').innerHTML=`
+    <div class="sec"><h4>责任岗位 / 涉及系统</h4><p>${n.role||'—'} · ${n.sys||'—'}</p></div>
+    <div class="sec"><h4>操作说明</h4><p>${n.note}</p></div>
+    <div class="sec"><h4>上游</h4><div class="rel">${row(up,'up')}</div></div>
+    <div class="sec"><h4>下游</h4><div class="rel">${row(down,'down')}</div></div>`;
+  document.querySelectorAll('[data-goto]').forEach(b=>{
+    b.onclick=()=>{ centerOn(b.dataset.goto); select(b.dataset.goto); };
+  });
+  centerOn(id);
+}
+document.getElementById('close').onclick=()=>{
+  drawer.classList.remove('on'); vp.classList.remove('on');
+  Object.values(dom).forEach(e=>e.classList.remove('sel'));
+};
+addEventListener('keydown',ev=>{ if(ev.key==='Escape') document.getElementById('close').click(); });
+
+/* =========================================================
+   6. 阶段筛选
+   ========================================================= */
+let activePhase='all';
+const tabs=document.getElementById('tabs');
+['all',...PHASES.map(p=>p.id)].forEach(id=>{
+  const b=document.createElement('button');
+  b.dataset.p=id;
+  b.textContent=id==='all'?'全流程':(PHASES.find(p=>p.id===id)?.name||id);
+  if(id==='all') b.classList.add('on');
+  tabs.appendChild(b);
+});
+tabs.onclick=ev=>{
+  const b=ev.target.closest('button'); if(!b) return;
+  [...tabs.children].forEach(x=>x.classList.toggle('on',x===b));
+  activePhase=b.dataset.p;
+  NODES.forEach(n=>dom[n.id].classList.toggle('ghost', activePhase!=='all'&&n.p!==activePhase));
+  EDGES.forEach(e=>{
+    const on=activePhase==='all'||(NMAP[e.f].p===activePhase&&NMAP[e.t].p===activePhase);
+    e._el.style.display=on?'':'none';
+    if(e._lb) e._lb.style.display=on?'':'none';
+  });
+  document.getElementById('close').click();
+  fitView();
+};
+
+/* =========================================================
+   7. 流程演示
+   ========================================================= */
+let playTimer=null, playList=[], playIdx=0;
+const playBtn=document.getElementById('play');
+const toast=document.getElementById('toast');
+function say(m){ toast.textContent=m; toast.classList.add('on');
+  clearTimeout(say._t); say._t=setTimeout(()=>toast.classList.remove('on'),2200); }
+
+playBtn.onclick=()=>{ playTimer?stopPlay():startPlay(); };
+
+function startPlay(scope){
+  playList=SEQ.filter(([p])=>!scope||scope==='all'||p===scope).flatMap(([,ids])=>ids);
+  playIdx=0;
+  document.body.classList.add('playing');
+  playBtn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>停止演示';
+  tabs.querySelector(`[data-p="${scope||'all'}"]`).click();
+  step();
+}
+function step(){
+  Object.values(dom).forEach(e=>e.classList.remove('playing'));
+  EDGES.forEach(e=>{ e._el.classList.remove('live'); e._el.setAttribute('marker-end','url(#ar)'); });
+  if(playIdx>=playList.length){ stopPlay(true); return; }
+  const id=playList[playIdx];
+  dom[id].classList.add('playing');
+  const prev=playList.slice(0,playIdx).reverse()
+    .find(x=>EDGES.some(e=>(e.f===x&&e.t===id)||(e.f===id&&e.t===x)));
+  EDGES.forEach(e=>{
+    if(prev&&((e.f===prev&&e.t===id)||(e.f===id&&e.t===prev))){
+      e._el.classList.add('live'); e._el.setAttribute('marker-end','url(#ar-live)');
+    }
+  });
+  centerOn(id);
+  const n=NMAP[id];
+  say(`步骤 ${playIdx+1}/${playList.length} · ${n.t}`);
+  playIdx++;
+  playTimer=setTimeout(step,1250);
+}
+function stopPlay(done){
+  clearTimeout(playTimer); playTimer=null;
+  Object.values(dom).forEach(e=>e.classList.remove('playing'));
+  EDGES.forEach(e=>{ e._el.classList.remove('live'); e._el.setAttribute('marker-end','url(#ar)'); });
+  playBtn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>流程演示';
+  document.body.classList.remove('playing');
+  if(done) say(`演示结束 · 共 ${playList.length} 步`);
+  fitView();
+}
+
+/* =========================================================
+   8. 启动
+   ========================================================= */
+document.getElementById('fit').onclick=fitView;
+addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'){ document.getElementById('close').click(); if(playTimer) stopPlay(); }
+});
+addEventListener('resize',()=>{ apply(); });
+/* 画布尺寸按内容撑开，保证缩放平移有足够空间 */
+(function sizeCanvas(){
+  let w=0,h=0;
+  NODES.forEach(n=>{ w=Math.max(w,n.x+NW/2+60); h=Math.max(h,n.y+nh(n)/2+80); });
+  canvas.style.width=w+'px'; canvas.style.height=h+'px';
+  wires.setAttribute('width',w); wires.setAttribute('height',h);
+})();
+fitView();
+</script>
+</body>
+</html>
