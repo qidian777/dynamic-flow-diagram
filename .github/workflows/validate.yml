@@ -1,0 +1,38 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  skill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate skill package
+        run: python scripts/validate_skill.py .
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Syntax check shot.js
+        run: node --check scripts/shot.js
+
+      - name: Smoke test template rendering
+        run: |
+          npm i playwright --no-save --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node scripts/shot.js assets/template.html ./shots
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: shots

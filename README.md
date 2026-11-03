@@ -1,6 +1,7 @@
 # dynamic-flow-diagram 动态流程图生成器
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![validate](https://github.com/qidian777/dynamic-flow-diagram/actions/workflows/validate.yml/badge.svg)](https://github.com/qidian777/dynamic-flow-diagram/actions/workflows/validate.yml)
 [![Skill](https://img.shields.io/badge/Type-Agent%20Skill-8b5cf6)](#安装)
 [![Format](https://img.shields.io/badge/Format-SKILL.md%20(Agent%20Skills)-green)](https://github.com/anthropics/skills)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#贡献)
@@ -87,7 +88,8 @@ dynamic-flow-diagram/
 │   └── qa-checklist.md           # 交付前验收清单
 ├── scripts/
 │   ├── parse_vsdx.py             # .vsdx → JSON（形状/连线/文本）
-│   └── shot.js                   # Playwright 截图自查
+│   ├── shot.js                   # Playwright 截图自查
+│   └── validate_skill.py         # 技能包自检（CI 跑这个）
 ├── assets/
 │   └── template.html             # 可直接改数据的工作骨架（含示例流程）
 └── docs/screenshots/             # 截图
