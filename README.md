@@ -118,10 +118,10 @@ dynamic-flow-diagram/
 | 方式 | 操作 |
 |---|---|
 | **Claude Code / 其他 Agent Skills 工具** | `git clone` 到技能目录（见[快速开始](#快速开始)），或下载 zip 解压进去 |
-| **WorkBuddy 技能市场** | 添加技能 → 上传 zip → [直接下载 dynamic-flow-diagram.zip](https://github.com/qidian777/dynamic-flow-diagram/raw/main/dist/dynamic-flow-diagram.zip)（32 KB，含 SKILL.md / 模板 / 脚本） |
+| **WorkBuddy 技能市场** | 添加技能 → 上传 zip → [下载 v1.0.0 dynamic-flow-diagram.zip](https://github.com/qidian777/dynamic-flow-diagram/releases/download/v1.0.0/dynamic-flow-diagram.zip)（35 KB，含 SKILL.md / 模板 / 脚本，固定版本） |
 | **只要模板看看** | 打开 [`assets/template.html`](assets/template.html)，复制源码即可，无需安装 |
 
-> zip 由仓库内文件打包而成，随 `main` 分支更新。需要固定版本可用 [v1.0.0 源码归档](https://github.com/qidian777/dynamic-flow-diagram/archive/refs/tags/v1.0.0.zip)。
+> 上面是发行版（随 tag 固定，推荐）。想跟最新改动可用 [`main` 分支 zip](https://github.com/qidian777/dynamic-flow-diagram/raw/main/dist/dynamic-flow-diagram.zip)，或 [v1.0.0 源码归档](https://github.com/qidian777/dynamic-flow-diagram/archive/refs/tags/v1.0.0.zip)。
 
 ## 适用 / 不适用
 
