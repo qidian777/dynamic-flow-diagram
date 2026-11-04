@@ -10,7 +10,7 @@
 
 > English below · [README (EN)](#english)
 
-![demo](docs/screenshots/demo.gif)
+![demo](https://raw.githubusercontent.com/qidian777/dynamic-flow-diagram/main/docs/screenshots/demo.gif)
 
 *悬停看说明 → 点击「流程演示」自动走完全程 —— 以上交互全部来自模板 `assets/template.html`，改数据即可用*
 
@@ -40,7 +40,7 @@
 - 🔍 **三层信息架构** —— 扫一眼（气泡）→ 看单步（抽屉）→ 系统读（原文弹窗）
 - 📦 **单文件交付** —— 无依赖、无 CDN、离线可用
 
-![hover](docs/screenshots/hover.png)
+![hover](https://raw.githubusercontent.com/qidian777/dynamic-flow-diagram/main/docs/screenshots/hover.png)
 
 ## 快速开始
 
@@ -91,16 +91,18 @@ dynamic-flow-diagram/
 │   ├── layout-rules.md           # vsdx 解析、栅格参数、连线算法
 │   ├── interaction-spec.md       # 交互清单、气泡避让实现、踩坑记录
 │   └── qa-checklist.md           # 交付前验收清单
-├── scripts/
+├── scripts/                      # ★ 随技能分发
 │   ├── parse_vsdx.py             # .vsdx → JSON（形状/连线/文本）
 │   ├── shot.js                   # Playwright 截图自查
-│   ├── validate_skill.py         # 技能包自检（CI 跑这个）
-│   └── setup_repo_meta.py        # 仓库维护：description / topics / release
+│   └── validate_skill.py         # 技能包自检（CI 跑这个）
 ├── assets/
 │   └── template.html             # 可直接改数据的工作骨架（含示例流程）
+├── tools/                        # 仓库维护用，不进入发布包
+│   ├── package.py                # 白名单打包 + 包内容校验
+│   └── setup_repo_meta.py        # description / topics / Release 设置
 ├── dist/
-│   └── dynamic-flow-diagram.zip  # 打包版（技能市场 / 手动安装用）
-└── docs/screenshots/             # 截图
+│   └── dynamic-flow-diagram.zip  # 打包产物（技能市场 / 手动安装用）
+└── docs/screenshots/             # 截图与演示 GIF（README 用绝对链接引用）
 ```
 
 ## 七条铁律（踩坑换来的）
@@ -120,10 +122,11 @@ dynamic-flow-diagram/
 | 方式 | 操作 |
 |---|---|
 | **Claude Code / 其他 Agent Skills 工具** | `git clone` 到技能目录（见[快速开始](#快速开始)），或下载 zip 解压进去 |
-| **WorkBuddy 技能市场** | 添加技能 → 上传 zip → [下载 v1.0.0 dynamic-flow-diagram.zip](https://github.com/qidian777/dynamic-flow-diagram/releases/download/v1.0.0/dynamic-flow-diagram.zip)（35 KB，含 SKILL.md / 模板 / 脚本，固定版本） |
+| **WorkBuddy 技能市场** | 添加技能 → 上传 zip → [下载 v1.0.1 dynamic-flow-diagram.zip](https://github.com/qidian777/dynamic-flow-diagram/releases/download/v1.0.1/dynamic-flow-diagram.zip)（含 SKILL.md / 模板 / 脚本，固定版本） |
 | **只要模板看看** | 打开 [`assets/template.html`](assets/template.html)，复制源码即可，无需安装 |
 
-> 上面是发行版（随 tag 固定，推荐）。想跟最新改动可用 [`main` 分支 zip](https://github.com/qidian777/dynamic-flow-diagram/raw/main/dist/dynamic-flow-diagram.zip)，或 [v1.0.0 源码归档](https://github.com/qidian777/dynamic-flow-diagram/archive/refs/tags/v1.0.0.zip)。
+> 上面是发行版（随 tag 固定，推荐）。想跟最新改动可用 [`main` 分支 zip](https://github.com/qidian777/dynamic-flow-diagram/raw/main/dist/dynamic-flow-diagram.zip)。
+> 发布包由 `tools/package.py` 白名单构建，只含技能运行必需文件；维护脚本（`tools/`）、CI 配置与截图不进包。
 
 ## 适用 / 不适用
 
@@ -140,6 +143,18 @@ dynamic-flow-diagram/
 Quick start: clone into `~/.claude/skills/`, then ask your agent: *"Turn the procurement process in this .vsdx into an interactive diagram."* Or just edit the data section at the top of `assets/template.html`.
 
 `scripts/parse_vsdx.py` parses `.vsdx` (it's a zip/OOXML) into JSON; `scripts/shot.js` takes Playwright screenshots and checks that overlays never cover nodes before you ship.
+
+## 更新日志
+
+**v1.0.1**（2026-11-04）
+- 修复：`v1.0.0` 的 tag 原本指向首个提交，其中 README 仍含仓库名占位符（照抄 clone 命令会失败）、`.gitignore` 为旧版 —— v1.0.1 从修复后的提交重新打 tag
+- 修复：一次性运维脚本 `setup_repo_meta.py` 被打进发布包，现已移到 `tools/` 并不再入包
+- 修复：发布包内 README 与 `main` 不一致；现由 `tools/package.py` 统一构建并自校验
+- 修复：包内不含截图导致 README 图片不显示；图片改为绝对链接
+- 新增：README 顶部演示 GIF
+- 发布包构成：`SKILL.md` / `README.md` / `LICENSE` / `assets/` / `references/` ×3 / `scripts/` ×3，共 10 个文件
+
+**v1.0.0**（2026-11-03）首版：七条铁律 + 模板骨架 + vsdx 解析 + 截图自查
 
 ## 贡献
 

@@ -18,6 +18,10 @@ jobs:
       - name: Validate skill package
         run: python scripts/validate_skill.py .
 
+      - name: Verify dist zip matches source
+        # 比对内容哈希而非字节：跨 OS / Python/zlib 版本也能判定包是否过期
+        run: python tools/package.py --check
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

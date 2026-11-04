@@ -13,7 +13,7 @@ examples_en:
   - "Turn the procurement process in this .vsdx into an interactive diagram"
   - "Show me the returns flow from the salesperson's point of view"
   - "Make this process description into a page I can present in training"
-version: 1.0.0
+version: 1.0.1
 author: 施鸿雁（美美虾-阿羽）
 license: MIT
 allowed-tools: Read, Write, Edit, Bash, ViewImage
