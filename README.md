@@ -92,7 +92,8 @@ dynamic-flow-diagram/
 ├── scripts/
 │   ├── parse_vsdx.py             # .vsdx → JSON（形状/连线/文本）
 │   ├── shot.js                   # Playwright 截图自查
-│   └── validate_skill.py         # 技能包自检（CI 跑这个）
+│   ├── validate_skill.py         # 技能包自检（CI 跑这个）
+│   └── setup_repo_meta.py        # 仓库维护：description / topics / release
 ├── assets/
 │   └── template.html             # 可直接改数据的工作骨架（含示例流程）
 ├── dist/
