@@ -51,6 +51,11 @@ def collect():
     return files
 
 
+def norm(b):
+    """行尾归一：Windows 检出为 CRLF、Linux 为 LF，比较内容时忽略差异。"""
+    return b.replace(b'\r\n', b'\n')
+
+
 def skill_version():
     with open(os.path.join(ROOT, 'SKILL.md'), encoding='utf-8') as f:
         m = re.search(r'^version:\s*(\S+)', f.read(), re.M)
@@ -95,8 +100,8 @@ def verify():
         stale = []
         for rel in collect():
             with open(os.path.join(ROOT, rel), 'rb') as f:
-                disk = hashlib.md5(f.read()).hexdigest()
-            inside = hashlib.md5(z.read(f'{PKG_NAME}/{rel}')).hexdigest()
+                disk = hashlib.md5(norm(f.read())).hexdigest()
+            inside = hashlib.md5(norm(z.read(f'{PKG_NAME}/{rel}'))).hexdigest()
             if disk != inside:
                 stale.append(rel)
         if stale:
