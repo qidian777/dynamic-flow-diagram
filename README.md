@@ -10,7 +10,9 @@
 
 > English below · [README (EN)](#english)
 
-![overview](docs/screenshots/overview.png)
+![demo](docs/screenshots/demo.gif)
+
+*悬停看说明 → 点击「流程演示」自动走完全程 —— 以上交互全部来自模板 `assets/template.html`，改数据即可用*
 
 ## 为什么做这个
 
