@@ -1,2 +1,18 @@
 node_modules/
 *.png.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / 编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 调试产物
+*.log
+shots/

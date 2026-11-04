@@ -48,7 +48,10 @@
 
 ```bash
 # Claude Code：克隆到技能目录
-git clone https://github.com/<your-name>/dynamic-flow-diagram.git ~/.claude/skills/dynamic-flow-diagram
+git clone https://github.com/qidian777/dynamic-flow-diagram.git ~/.claude/skills/dynamic-flow-diagram
+
+# WorkBuddy（Windows 示例，其他系统换成对应技能目录）
+# 解压打包版到 ~/.workbuddy/skills/dynamic-flow-diagram/
 ```
 
 然后对 Agent 说：
@@ -92,6 +95,8 @@ dynamic-flow-diagram/
 │   └── validate_skill.py         # 技能包自检（CI 跑这个）
 ├── assets/
 │   └── template.html             # 可直接改数据的工作骨架（含示例流程）
+├── dist/
+│   └── dynamic-flow-diagram.zip  # 打包版（技能市场 / 手动安装用）
 └── docs/screenshots/             # 截图
 ```
 
@@ -109,9 +114,13 @@ dynamic-flow-diagram/
 
 ## 安装
 
-- **WorkBuddy**：技能市场 → 添加技能 → 上传 `dynamic-flow-diagram.zip`（[Releases](../../releases) 下载）
-- **Claude Code**：`git clone` 到 `~/.claude/skills/`
-- **其他兼容 Agent Skills 的工具**：把目录放入对应技能目录即可
+| 方式 | 操作 |
+|---|---|
+| **Claude Code / 其他 Agent Skills 工具** | `git clone` 到技能目录（见[快速开始](#快速开始)），或下载 zip 解压进去 |
+| **WorkBuddy 技能市场** | 添加技能 → 上传 zip → [直接下载 dynamic-flow-diagram.zip](https://github.com/qidian777/dynamic-flow-diagram/raw/main/dist/dynamic-flow-diagram.zip)（32 KB，含 SKILL.md / 模板 / 脚本） |
+| **只要模板看看** | 打开 [`assets/template.html`](assets/template.html)，复制源码即可，无需安装 |
+
+> zip 由仓库内文件打包而成，随 `main` 分支更新。需要固定版本可用 [v1.0.0 源码归档](https://github.com/qidian777/dynamic-flow-diagram/archive/refs/tags/v1.0.0.zip)。
 
 ## 适用 / 不适用
 
