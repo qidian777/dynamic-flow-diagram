@@ -6,7 +6,9 @@
 [![Format](https://img.shields.io/badge/Format-SKILL.md%20(Agent%20Skills)-green)](https://github.com/anthropics/skills)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#贡献)
 
-**一个 Agent Skill：把 Visio / 文字描述的业务流程，变成单文件可交互的 HTML 动态流程图** —— 标准流程图图形、冻结泳道、阶段筛选、悬停说明、自动演示。专为**流程培训、评审汇报、岗位职责梳理**设计。
+**一个 Agent Skill：把 Visio / 文字描述的业务流程，变成单文件可交互的 HTML** ——
+单图是动态流程图（标准图形、冻结泳道、阶段筛选、悬停说明、自动演示）；
+v2 起支持**流程工作台**：全公司多张流程装进一个 HTML，总览、索引、跨流程跳转、岗位统计、一致性检查。专为**流程培训、评审汇报、岗位职责梳理、流程体系治理**设计。
 
 > English below · [README (EN)](#english)
 
@@ -41,6 +43,22 @@
 - 📦 **单文件交付** —— 无依赖、无 CDN、离线可用
 
 ![hover](https://raw.githubusercontent.com/qidian777/dynamic-flow-diagram/main/docs/screenshots/hover.png)
+
+### v2：流程工作台
+
+单张图够用之后，公司真正的难点是**几十张流程各画各的**：子流程引用全靠口头、
+同一个岗位散落在十几张图里、"客户/甲方/业主"三种叫法并存。工作台把所有流程
+装进同一个 HTML：
+
+![workbench](https://raw.githubusercontent.com/qidian777/dynamic-flow-diagram/main/docs/screenshots/workbench_home.png)
+
+- 🏠 **主流程总览** —— 价值流分列，虚框节点点进去就是子流程
+- 🔎 **流程索引** —— 按名称或节点内容搜索，部门/角色/系统三筛选并联
+- 🔗 **子流程串联** —— 跳到目标流程的指定节点并高亮，面包屑随时返回
+- 👥 **岗位视角** —— "设备管理员在 3 张流程里要处理 21 次"，逐条可跳转
+- 🩺 **一致性检查** —— 断链、术语不统一、自我审批，构建时自动体检
+
+![issues](https://raw.githubusercontent.com/qidian777/dynamic-flow-diagram/main/docs/screenshots/workbench_issues.png)
 
 ## 快速开始
 
@@ -122,7 +140,7 @@ dynamic-flow-diagram/
 | 方式 | 操作 |
 |---|---|
 | **Claude Code / 其他 Agent Skills 工具** | `git clone` 到技能目录（见[快速开始](#快速开始)），或下载 zip 解压进去 |
-| **WorkBuddy 技能市场** | 添加技能 → 上传 zip → [下载 v1.0.1 dynamic-flow-diagram.zip](https://github.com/qidian777/dynamic-flow-diagram/releases/download/v1.0.1/dynamic-flow-diagram.zip)（含 SKILL.md / 模板 / 脚本，固定版本） |
+| **WorkBuddy 技能市场** | 添加技能 → 上传 zip → [下载 v2.0.0 dynamic-flow-diagram.zip](https://github.com/qidian777/dynamic-flow-diagram/releases/download/v2.0.0/dynamic-flow-diagram.zip)（含 SKILL.md / 模板 / 脚本，固定版本） |
 | **只要模板看看** | 打开 [`assets/template.html`](assets/template.html)，复制源码即可，无需安装 |
 
 > 上面是发行版（随 tag 固定，推荐）。想跟最新改动可用 [`main` 分支 zip](https://github.com/qidian777/dynamic-flow-diagram/raw/main/dist/dynamic-flow-diagram.zip)。
@@ -135,6 +153,7 @@ dynamic-flow-diagram/
 | 流程培训、新人带教、评审汇报 | 需要真实系统联动的流程引擎 |
 | Visio 老图交互化改造 | 只要一张静态配图 |
 | 「谁在什么阶段做什么」梳理 | 架构图、思维导图、数据看板 |
+| **多张流程的体系治理**：断链、术语统一、职责冲突检查 | 需要流程引擎执行/审批流 |
 
 ## English
 
@@ -145,6 +164,15 @@ Quick start: clone into `~/.claude/skills/`, then ask your agent: *"Turn the pro
 `scripts/parse_vsdx.py` parses `.vsdx` (it's a zip/OOXML) into JSON; `scripts/shot.js` takes Playwright screenshots and checks that overlays never cover nodes before you ship.
 
 ## 更新日志
+
+**v2.0.0**（2026-11-05）工作台模式
+- 新增：**流程工作台** —— 把全公司多张流程装进一个 HTML，五个视图：主流程总览、流程索引（搜索 + 按部门/角色/系统筛选）、跨流程岗位统计、一致性检查报告
+- 新增：**子流程串联** —— 点击子流程节点跳到目标流程的指定节点，面包屑返回，可一路点下去
+- 新增：**一致性检查器** —— 断链（引用不存在的流程/节点）、术语不统一（别名声明式检查）、职责冲突（自我审批、同类动作跨流程角色不一致）
+- 新增：**自动布局** —— manifest 里不写坐标，拓扑分层 + 泳道定列自动排布；回边（如"换货后重新到货"）安全处理
+- 新增：`examples/demo-manifest.yaml` 虚构示例（4 张流程 45 个节点，故意埋了 3 处问题当检查器测试用例）
+- 新增：`scripts/build_workbench.py`（校验/检查/构建）、`scripts/shot_workbench.js`（七图断言自查）、`references/workbench-spec.md`
+- 单图模式原样保留，两种模式按场景选择
 
 **v1.0.1**（2026-11-04）
 - 修复：`v1.0.0` 的 tag 原本指向首个提交，其中 README 仍含仓库名占位符（照抄 clone 命令会失败）、`.gitignore` 为旧版 —— v1.0.1 从修复后的提交重新打 tag

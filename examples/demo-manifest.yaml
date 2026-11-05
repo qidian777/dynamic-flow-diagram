@@ -1,0 +1,595 @@
+# ============================================================================
+# 流程工作台 · 中央清单（manifest）
+# ----------------------------------------------------------------------------
+# 这是整个流程宇宙的唯一数据源。build_workbench.py 读它，产出单文件 HTML。
+#
+# 三层结构：
+#   1. dictionaries  全局字典（部门/角色/系统）—— 岗位统计与筛选的口径来源
+#   2. terms         术语别名组 —— 一致性检查的"标准答案"
+#   3. flows         流程集 —— 每张流程的阶段/泳道/节点/连线
+#
+# 本文件是**虚构示例**（宏远精密制造为演示虚构，不含任何真实企业信息），
+# 同时用作检查器的测试用例，故故意包含 3 处问题，见文件末尾"埋点说明"。
+# ============================================================================
+
+meta:
+  org: 宏远精密制造
+  title: 设备管理流程工作台
+  subtitle: 4 张流程 · 覆盖设备从采购到报废的全生命周期
+  version: "1.0"
+  updated: 2026-11-05
+
+# ---------------------------------------------------------------------------
+# 全局字典
+# ---------------------------------------------------------------------------
+dictionaries:
+  departments:
+    - {id: prod, name: 生产部}
+    - {id: equip, name: 设备部}
+    - {id: buy, name: 采购部}
+    - {id: fin, name: 财务部}
+
+  roles:
+    - {id: user,   name: 使用人,     dept: prod,  color: "#2563eb"}
+    - {id: keeper, name: 设备管理员, dept: equip, color: "#7c3aed"}
+    - {id: buyer,  name: 采购员,     dept: buy,   color: "#0d9488"}
+    - {id: cashier,name: 财务专员,   dept: fin,   color: "#c2410c"}
+    - {id: manager,name: 设备部经理, dept: equip, color: "#be123c"}
+    - {id: vendor, name: 外部供应商, dept: null,  color: "#64748b"}
+
+  systems:
+    - {id: cmms, name: 设备管理系统}
+    - {id: erp,  name: ERP}
+    - {id: srm,  name: 供应商协同平台}
+    - {id: oa,   name: OA}
+
+# ---------------------------------------------------------------------------
+# 术语别名组：canonical 是唯一正确叫法，aliases 是历史遗留/部门习惯叫法
+# 检查器会扫全部节点文本，出现 aliases 即提示统一
+# ---------------------------------------------------------------------------
+terms:
+  - {canonical: 设备台账,   aliases: [设备档案, 设备清册]}
+  - {canonical: 使用人,     aliases: [操作工, 使用者]}
+  - {canonical: 报修单,     aliases: [维修申请, 故障单]}
+  - {canonical: 供应商,     aliases: [厂商, 供方]}
+
+# ---------------------------------------------------------------------------
+# 流程集
+# role: main 的流程会作为首页总览
+# lanes 决定左右分栏顺序；phases 决定分段；节点坐标由布局引擎自动计算
+# 节点 type: start | proc | dec | data | db | sub | end
+# 节点的 sub 字段声明跨流程引用：{flow: 目标流程id, node: 目标节点id}
+# ---------------------------------------------------------------------------
+flows:
+
+  # ---------------------------------------------------------------- 主流程
+  - id: life_main
+    name: 设备全生命周期
+    role: main
+    dept: equip
+    summary: >
+      设备从"要不要买"到"最后怎么处置"的主干路径。四个阶段对应四类决策：
+      需求要不要立项、货到要不要收、坏了怎么修、不能用了怎么退场。
+      具体执行动作分别落在采购、报修、报废三张子流程里，本图只保留决策点。
+    lanes: [user, keeper, buyer, cashier, vendor]
+    phases:
+      - {id: s1, name: ① 需求与采购}
+      - {id: s2, name: ② 到货与验收}
+      - {id: s3, name: ③ 使用与维护}
+      - {id: s4, name: ④ 处置}
+    nodes:
+      - id: m1
+        phase: s1
+        lane: user
+        type: start
+        text: 提出设备需求
+        role: user
+        system: oa
+        note: 使用人发现产能或工艺缺口，在 OA 提需求。此时只是"想要"，还没进入采购程序。
+
+      - id: m2
+        phase: s1
+        lane: keeper
+        type: proc
+        text: 编制采购申请
+        role: keeper
+        system: cmms
+        note: 设备管理员核对现有设备利用率，确认是"新增"还是"调剂"，再折算预算口径。操作工不得跳过此步直接找采购。
+
+      - id: m3
+        phase: s1
+        lane: keeper
+        type: dec
+        text: 金额超年度预算？
+        role: keeper
+        system: —
+        note: 以年度设备预算为界。超预算走财务审批，预算内直接进采购。
+
+      - id: m4
+        phase: s1
+        lane: cashier
+        type: proc
+        text: 预算审批
+        role: cashier
+        system: oa
+        note: 财务核对预算科目与资金计划，跨年度项目需要单独列示。
+
+      - id: m5
+        phase: s1
+        lane: buyer
+        type: sub
+        text: 执行《设备采购流程》
+        role: buyer
+        system: —
+        note: 采购动作全部在子流程里，本图不展开。点击进入采购流程。
+        sub: {flow: purchase, node: p1}
+
+      - id: m6
+        phase: s2
+        lane: keeper
+        type: proc
+        text: 到货清点
+        role: keeper
+        system: cmms
+        note: 按采购订单逐项核对型号、数量、随机附件，缺件当场记录，不签收。
+
+      - id: m7
+        phase: s2
+        lane: user
+        type: proc
+        text: 开箱验收
+        role: user
+        system: —
+        note: 使用人做功能验收，设备管理员做数量与外观验收。验收结论必须落在同一张验收单上。
+
+      - id: m8
+        phase: s2
+        lane: keeper
+        type: dec
+        text: 验收合格？
+        role: keeper
+        system: —
+        note: 不合格退回供应商换货，合格才建账。未建账的设备不得投入使用。
+
+      - id: m9
+        phase: s2
+        lane: vendor
+        type: proc
+        text: 换货处理
+        role: vendor
+        system: srm
+        note: 供应商在协同平台确认换货计划，换回后重新走到货清点。
+
+      - id: m10
+        phase: s2
+        lane: keeper
+        type: db
+        text: 建立设备台账
+        role: keeper
+        system: cmms
+        note: 生成设备编号并写入设备台账，这是后续所有维修、点检、报废记录的主键。
+
+      - id: m11
+        phase: s2
+        lane: keeper
+        type: proc
+        text: 张贴电子标签
+        role: keeper
+        system: cmms
+        note: 标签与设备编号绑定，扫码即可查看台账与维修历史。
+
+      - id: m12
+        phase: s3
+        lane: user
+        type: sub
+        text: 执行《设备报修流程》
+        role: user
+        system: —
+        note: 设备出现故障或异常时由此进入报修流程，本图不展开。
+        sub: {flow: repair, node: r1}
+
+      - id: m13
+        phase: s3
+        lane: keeper
+        type: proc
+        text: 月度点检保养
+        role: keeper
+        system: cmms
+        note: 按设备类别定期点检，结果录入设备系统。点检发现异常同样转报修。
+
+      - id: m14
+        phase: s4
+        lane: keeper
+        type: sub
+        text: 执行《设备报废流程》
+        role: keeper
+        system: —
+        note: 达到使用年限、修复不经济或安全不达标时进入报废流程。
+        sub: {flow: scrap, node: s1}
+
+      - id: m15
+        phase: s4
+        lane: keeper
+        type: end
+        text: 生命周期结束
+        role: keeper
+        system: —
+        note: 台账核销完成，资产从在册设备中移除。
+    edges:
+      - {from: m1,  to: m2}
+      - {from: m2,  to: m3}
+      - {from: m3,  to: m4, label: 超预算}
+      - {from: m3,  to: m5, label: 预算内}
+      - {from: m4,  to: m5}
+      - {from: m5,  to: m6}
+      - {from: m6,  to: m7}
+      - {from: m7,  to: m8}
+      - {from: m8,  to: m9, label: 否}
+      - {from: m9,  to: m6, label: 重新到货}
+      - {from: m8,  to: m10, label: 是}
+      - {from: m10, to: m11}
+      - {from: m11, to: m12}
+      - {from: m12, to: m13}
+      - {from: m13, to: m14}
+      - {from: m14, to: m15}
+
+  # -------------------------------------------------------------- 子流程 1
+  - id: purchase
+    name: 设备采购流程
+    dept: buy
+    summary: >
+      从收到采购需求到订单交付。核心是"三家里选一家"的比价留痕，
+      以及合同金额与授权层级的对应关系。
+    lanes: [buyer, cashier]
+    phases:
+      - {id: q1, name: ① 询价比价}
+      - {id: q2, name: ② 合同签订}
+      - {id: q3, name: ③ 履约跟踪}
+    nodes:
+      - id: p1
+        phase: q1
+        lane: buyer
+        type: start
+        text: 接收采购需求
+        role: buyer
+        system: cmms
+        note: 需求来源可以是主流程的预算内申请，也可以是年度集采计划。
+
+      - id: p2
+        phase: q1
+        lane: buyer
+        type: proc
+        text: 向三家以上询价
+        role: buyer
+        system: srm
+        note: 询价记录必须留痕，单一来源采购需附说明并经审批。
+
+      - id: p3
+        phase: q1
+        lane: buyer
+        type: data
+        text: 比价表
+        role: buyer
+        system: srm
+        note: 比价表含价格、交期、质保、付款条件四列，不能只看价格。
+
+      - id: p4
+        phase: q1
+        lane: buyer
+        type: dec
+        text: 达到招标门槛？
+        role: buyer
+        system: —
+        note: 按公司采购制度约定的金额门槛判断，达到则必须走招标。
+
+      - id: p5
+        phase: q1
+        lane: buyer
+        type: proc
+        text: 组织招标
+        role: buyer
+        system: oa
+        note: 招标需提前公示，评标小组至少三人且不含需求提出人。
+
+      - id: p6
+        phase: q2
+        lane: buyer
+        type: proc
+        text: 拟定采购合同
+        role: buyer
+        system: oa
+        note: 合同条款沿用标准模板，偏离模板的条款需法务确认。
+
+      - id: p7
+        phase: q2
+        lane: buyer
+        type: dec
+        text: 超授权金额？
+        role: buyer
+        system: —
+        note: 授权表见采购制度附表，按金额分三级。
+
+      - id: p8
+        phase: q2
+        lane: buyer
+        type: proc
+        text: 合同签批
+        role: buyer
+        system: oa
+        note: 按授权层级提交签批，签批完成后合同生效。
+
+      - id: p9
+        phase: q3
+        lane: buyer
+        type: proc
+        text: 下单并跟踪交期
+        role: buyer
+        system: srm
+        note: 交期延误超过三天的，需同步设备管理员调整安装计划。
+
+      - id: p10
+        phase: q3
+        lane: buyer
+        type: data
+        text: 采购订单
+        role: buyer
+        system: erp
+        note: 采购订单是到货清点与对账的唯一依据。
+
+      - id: p11
+        phase: q3
+        lane: buyer
+        type: end
+        text: 交付转验收
+        role: buyer
+        system: —
+        note: 订单交付后回到主流程的到货清点环节。
+    edges:
+      - {from: p1,  to: p2}
+      - {from: p2,  to: p3}
+      - {from: p3,  to: p4}
+      - {from: p4,  to: p5, label: 是}
+      - {from: p4,  to: p6, label: 否}
+      - {from: p5,  to: p6}
+      - {from: p6,  to: p7}
+      - {from: p7,  to: p8, label: 是}
+      - {from: p7,  to: p9, label: 否}
+      - {from: p8,  to: p9}
+      - {from: p9,  to: p10}
+      - {from: p10, to: p11}
+
+  # -------------------------------------------------------------- 子流程 2
+  - id: repair
+    name: 设备报修流程
+    dept: equip
+    summary: >
+      故障上报到维修关闭。关键分岔是"停机故障"与"一般故障"——
+      前者必须现场抢修，后者可以走备件或外委。
+    lanes: [user, keeper, buyer, vendor]
+    phases:
+      - {id: r1p, name: ① 报修受理}
+      - {id: r2p, name: ② 维修处理}
+      - {id: r3p, name: ③ 验收归档}
+    nodes:
+      - id: r1
+        phase: r1p
+        lane: user
+        type: start
+        text: 提交报修单
+        role: user
+        system: cmms
+        note: 在设备管理系统扫码报修，自动带出设备编号与历史维修记录，系统同时生成一张故障单号。
+
+      - id: r2
+        phase: r1p
+        lane: keeper
+        type: proc
+        text: 判断故障等级
+        role: keeper
+        system: —
+        note: 分停机故障、影响产能、一般异常三级，等级决定响应时限。
+
+      - id: r3
+        phase: r1p
+        lane: keeper
+        type: dec
+        text: 是否停机故障？
+        role: keeper
+        system: —
+        note: 停机故障要求两小时内到场，其余按常规排期。
+
+      - id: r4
+        phase: r2p
+        lane: keeper
+        type: proc
+        text: 现场抢修
+        role: keeper
+        system: cmms
+        note: 抢修过程与更换件需现场记录，事后补录视为无效。
+
+      - id: r5
+        phase: r2p
+        lane: buyer
+        type: sub
+        text: 执行《备件采购流程》
+        role: buyer
+        system: —
+        note: 缺件时转备件采购，备件到货后回到维修实施。
+        sub: {flow: spare_purchase, node: sp1}
+
+      - id: r6
+        phase: r2p
+        lane: keeper
+        type: proc
+        text: 联系外部维修
+        role: keeper
+        system: srm
+        note: 超出内部维修能力的，在协同平台发起外委工单。
+
+      - id: r7
+        phase: r2p
+        lane: vendor
+        type: proc
+        text: 维修实施
+        role: vendor
+        system: —
+        note: 供应商进场需登记，动火、登高等作业需另行审批。
+
+      - id: r8
+        phase: r3p
+        lane: keeper
+        type: proc
+        text: 维修验收
+        role: keeper
+        system: cmms
+        note: 验收标准是"恢复原有产能"，不是"能转就行"。验收结论写入台账。
+
+      - id: r9
+        phase: r3p
+        lane: keeper
+        type: db
+        text: 登记维修记录
+        role: keeper
+        system: cmms
+        note: 记录含故障现象、原因、更换件、工时、费用五项，用于后续故障分析。
+
+      - id: r10
+        phase: r3p
+        lane: keeper
+        type: end
+        text: 报修关闭
+        role: keeper
+        system: cmms
+        note: 关闭后设备状态恢复为在用。
+    edges:
+      - {from: r1, to: r2}
+      - {from: r2, to: r3}
+      - {from: r3, to: r4, label: 是}
+      - {from: r3, to: r5, label: 否}
+      - {from: r4, to: r9}
+      - {from: r5, to: r6}
+      - {from: r6, to: r7}
+      - {from: r7, to: r8}
+      - {from: r8, to: r9}
+      - {from: r9, to: r10}
+
+  # -------------------------------------------------------------- 子流程 3
+  - id: scrap
+    name: 设备报废流程
+    dept: equip
+    summary: >
+      设备退出使用后的鉴定与处置。判断点是"修复是否经济"——
+      不经济的才进入报废，否则转回报修流程。
+    lanes: [keeper, cashier, manager, vendor, user]
+    phases:
+      - {id: c1, name: ① 报废申请}
+      - {id: c2, name: ② 技术鉴定}
+      - {id: c3, name: ③ 处置核销}
+    nodes:
+      - id: s1
+        phase: c1
+        lane: keeper
+        type: start
+        text: 提交报废申请
+        role: keeper
+        system: cmms
+        note: 申请需附使用年限、累计维修费用、当前技术状态三项说明。
+
+      - id: s2
+        phase: c2
+        lane: keeper
+        type: proc
+        text: 技术鉴定
+        role: keeper
+        system: cmms
+        note: 由设备部组织鉴定，必要时请外部机构出具检测报告。
+
+      - id: s3
+        phase: c2
+        lane: keeper
+        type: dec
+        text: 修复是否经济？
+        role: keeper
+        system: —
+        note: 以"单次修复费用超过残值 50%"为界，超过即视为不经济。
+
+      - id: s4
+        phase: c2
+        lane: user
+        type: sub
+        text: 转《设备报修流程》
+        role: user
+        system: —
+        note: 判定可修复的，退回报修流程正常维修，本次报废申请终止。
+        sub: {flow: repair, node: r1}
+
+      - id: s5
+        phase: c3
+        lane: cashier
+        type: proc
+        text: 残值核算
+        role: cashier
+        system: erp
+        note: 按原值、已提折旧、预计处置收入计算净值。
+
+      - id: s6
+        phase: c3
+        lane: manager
+        type: proc
+        text: 报废审批
+        role: manager
+        system: oa
+        note: 设备部经理终审。单台原值超过五十万的需上报总经理。
+
+      - id: s7
+        phase: c3
+        lane: vendor
+        type: proc
+        text: 拆除与清运
+        role: vendor
+        system: —
+        note: 涉及危废的部件必须交有资质单位处理，留存转移联单。
+
+      - id: s8
+        phase: c3
+        lane: keeper
+        type: db
+        text: 台账核销
+        role: keeper
+        system: cmms
+        note: 核销后设备编号作废，设备档案保留五年备查。
+
+      - id: s9
+        phase: c3
+        lane: keeper
+        type: end
+        text: 报废完成
+        role: keeper
+        system: —
+        note: 财务同步做资产减少处理。
+    edges:
+      - {from: s1, to: s2}
+      - {from: s2, to: s3}
+      - {from: s3, to: s4, label: 可修复}
+      - {from: s3, to: s5, label: 不可修复}
+      - {from: s4, to: s9}
+      - {from: s5, to: s6}
+      - {from: s6, to: s7}
+      - {from: s7, to: s8}
+      - {from: s8, to: s9}
+
+# ============================================================================
+# 埋点说明（演示用，真实项目里请删掉这段）
+#
+# ① 断链：repair 流程的 r5「执行《备件采购流程》」引用了 spare_purchase，
+#    但清单里没有这张流程 —— 检查器应报 🔴 错误。
+#
+# ② 术语不一致：m1 的说明里用了"操作工"（应为"使用人"），
+#    m10 的说明里用了"设备台账"的正确叫法，但 r1 用了"故障单"（应为"报修单"）。
+#    —— 检查器应报 🟡 警告，并给出统一建议。
+#
+# ③ 职责冲突：purchase 流程里 p8「合同签批」由采购员执行，
+#    而合同是 p6 由采购员自己拟定的 —— 自己拟自己签，自我审批风险。
+#    另：m7「开箱验收」由使用人执行，r8「维修验收」由设备管理员执行，
+#    同类动作分属不同角色，属标准不统一。
+# ============================================================================

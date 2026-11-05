@@ -26,11 +26,11 @@ INCLUDE = [
     'SKILL.md',
     'README.md',
     'LICENSE',
-    'assets/template.html',
+    'assets/*.html',
+    'examples/*.yaml',
     'references/*.md',
-    'scripts/parse_vsdx.py',
-    'scripts/shot.js',
-    'scripts/validate_skill.py',
+    'scripts/*.py',
+    'scripts/*.js',
 ]
 
 # 无论白名单如何，这些路径一律禁止入包（防回归）

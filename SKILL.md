@@ -2,7 +2,7 @@
 name: dynamic-flow-diagram
 display_name: 动态流程图生成器
 display_name_en: Dynamic Flow Diagram Builder
-description: 把 Visio(.vsdx)、图片、表格或文字描述的业务流程，转成单文件可交互 HTML 动态流程图——标准流程图图形、冻结泳道、阶段筛选、悬停说明、点击详情、自动演示。用于流程培训、评审汇报、岗位职责梳理。当用户提到 Visio/vsdx、流程图、泳道图、流程梳理、流程培训、岗位流程、把流程做成可点击的网页时使用。
+description: 把 Visio(.vsdx)、图片、表格或文字描述的业务流程，转成单文件可交互 HTML——单图模式是动态流程图（标准图形、冻结泳道、悬停说明、自动演示）；工作台模式把全公司多张流程装进一个 HTML：总览、流程索引（搜索+按部门/角色/系统筛选）、子流程串联跳转、跨流程岗位统计、术语/断链/职责一致性检查。当用户提到 Visio/vsdx、流程图、泳道图、流程梳理、流程培训、岗位流程、流程体系、多张流程、流程工作台、把流程做成可点击的网页时使用。
 description_zh: 把 Visio 或文字描述的流程转成单文件可交互动态流程图：标准图形、冻结泳道、阶段筛选、悬停说明、演示动画。面向培训与评审场景。
 description_en: Turn Visio or text-described business processes into a single-file interactive HTML flow diagram with standard flowchart shapes, frozen swimlanes, phase filters, hover notes, and step-by-step playback.
 examples_zh:
@@ -13,7 +13,7 @@ examples_en:
   - "Turn the procurement process in this .vsdx into an interactive diagram"
   - "Show me the returns flow from the salesperson's point of view"
   - "Make this process description into a page I can present in training"
-version: 1.0.1
+version: 2.0.0
 author: 施鸿雁（美美虾-阿羽）
 license: MIT
 allowed-tools: Read, Write, Edit, Bash, ViewImage
@@ -32,7 +32,33 @@ allowed-tools: Read, Write, Edit, Bash, ViewImage
 | 梳理「谁在什么阶段做什么」 | 架构图、思维导图（形态不同） |
 | 流程变更前后对比讲解 | 数据看板（用图表类技能） |
 
-## 五步工作流
+## 两种模式，先选后做
+
+| | 单图模式（v1） | 工作台模式（v2） |
+|---|---|---|
+| 场景 | 一张流程图的培训/评审 | 全公司多张流程的体系梳理 |
+| 产出 | 一个 HTML 动态流程图 | 一个 HTML 流程工作台（五视图） |
+| 数据 | 直接改 template.html 里的数组 | 中央清单 manifest → 构建脚本 |
+| 坐标 | 手写 x/y | 自动布局（拓扑分层 + 泳道定列） |
+| 判断依据 | 用户只给了一张图/一个流程 | 用户提到"所有流程/多张流程/流程体系"，或流程之间存在子流程引用 |
+
+单图模式走下面"五步工作流"；工作台模式先读 `@references/workbench-spec.md`。
+
+## 工作台模式六步
+
+1. **取材**：三种入口殊途同归——vsdx 逐页解析、Excel 清单、口述建模，终点都是 manifest
+2. **建字典**：先定部门/角色/系统三张全局表，和客户确认口径，再动手写流程
+3. **写 manifest**：参考 `@examples/demo-manifest.yaml` 的结构；坐标不用写
+4. **体检**：`python scripts/build_workbench.py <manifest> --check`，断链和术语问题先清后建
+5. **构建**：`-o` 产出单文件 HTML；`--strict` 用于交付把关
+6. **验收**：`node scripts/shot_workbench.js <html> <shots>` 跑七图断言，再按 workbench-spec 的四条附加项过一遍
+
+工作台的铁律（在 v1 七条之上追加）：
+- **manifest 是唯一事实**。要改流程改 manifest 重新构建，永远不要直接改产出的 HTML
+- **字典先行**。角色和系统口径没和客户对齐之前，不写节点
+- **`--strict` 不过不交付**。断链是"点击就 404"级别的问题
+
+## 五步工作流（单图模式）
 
 ### 第 1 步：取材
 - `.vsdx` → 跑 `scripts/parse_vsdx.py`（见 `references/layout-rules.md` 里"解析"一节）；多页文件先看 `pages.xml` 选结构最全的一页，动手前跟用户确认选哪页
@@ -120,7 +146,12 @@ allowed-tools: Read, Write, Edit, Bash, ViewImage
 
 - `@references/layout-rules.md` — vsdx 解析方法、栅格参数、连线路径算法
 - `@references/interaction-spec.md` — 交互清单与实现要点、踩坑记录
+- `@references/workbench-spec.md` — 工作台模式：manifest 结构、自动布局、检查规则、五视图规格
 - `@references/qa-checklist.md` — 交付前逐条验收
-- `@assets/template.html` — 可直接改数据的工作骨架
+- `@assets/template.html` — 单图模式：可直接改数据的工作骨架
+- `@assets/workbench.html` — 工作台模式：五视图模板（由构建脚本注入数据，不直接改）
+- `@examples/demo-manifest.yaml` — 工作台 manifest 完整示例（虚构数据，含故意埋的问题）
 - `@scripts/parse_vsdx.py` — .vsdx → JSON
-- `@scripts/shot.js` — Playwright 截图自查
+- `@scripts/build_workbench.py` — manifest 校验 + 一致性检查 + 构建 HTML
+- `@scripts/shot.js` / `@scripts/shot_workbench.js` — 单图 / 工作台截图自查
+- `@scripts/validate_skill.py` — 技能包完整性校验

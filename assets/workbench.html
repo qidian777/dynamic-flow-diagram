@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>流程工作台</title>
+<style>
+  :root{
+    --bg:#f5f7fb; --panel:#fff; --line:#e3e8f0; --line2:#eef2f7;
+    --ink:#1b2434; --ink2:#4a5568; --mute:#8b95a8; --faint:#a8b2c4;
+    --brand:#2563eb; --brand2:#1d4ed8; --ok:#15803d; --warn:#b45309; --err:#be123c;
+    --shadow:0 6px 22px rgba(23,32,47,.08); --shadow2:0 12px 34px rgba(16,24,38,.14);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--ink); overflow-y:auto;
+    font:400 13px/1.55 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  body[data-view="flow"]{overflow:hidden}
+  a{color:var(--brand);text-decoration:none;cursor:pointer}
+  mark{background:#fef08a;color:inherit;border-radius:3px;padding:0 2px}
+
+  /* ---------------- 页头 ---------------- */
+  header{
+    position:sticky; top:0; z-index:60; height:58px;
+    display:flex; align-items:center; gap:16px; padding:0 22px;
+    background:rgba(255,255,255,.94); backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex; align-items:center; gap:9px; font-size:14px; font-weight:650; white-space:nowrap}
+  .brand .dot{width:7px;height:7px;border-radius:50%;background:var(--brand)}
+  .brand .sub{font-size:11px;color:var(--mute);font-weight:400}
+  nav.main{display:flex; gap:2px; margin-left:auto; background:#f1f4f9; padding:3px; border-radius:10px}
+  nav.main button{
+    border:0; background:transparent; font:inherit; font-size:12.5px; color:var(--ink2);
+    padding:6px 14px; border-radius:8px; cursor:pointer; white-space:nowrap;
+  }
+  nav.main button.on{background:#fff; color:var(--brand); font-weight:600; box-shadow:0 1px 4px rgba(23,32,47,.1)}
+  nav.main button:hover:not(.on){color:var(--ink)}
+
+  /* ---------------- 视图容器 ---------------- */
+  main{max-width:1280px;margin:0 auto;padding:26px 22px 70px}
+  body[data-view="flow"] main{max-width:none;padding:0}
+  .view{display:none}
+  .view.on{display:block}
+  h1.page{font-size:21px;font-weight:680;letter-spacing:-.2px}
+  .lede{font-size:12.8px;color:var(--ink2);margin-top:7px;line-height:1.7;max-width:760px}
+
+  /* ---------------- 首页 ---------------- */
+  .hero{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;margin-bottom:22px}
+  .hero .txt{flex:1 1 460px;min-width:280px}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap}
+  .kpi{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:11px 16px;min-width:92px;box-shadow:var(--shadow);
+  }
+  .kpi b{display:block;font-size:22px;font-weight:680;letter-spacing:-.5px;line-height:1.2}
+  .kpi span{font-size:10.5px;color:var(--mute);letter-spacing:.3px}
+  .kpi.bad b{color:var(--err)}
+
+  .sect-head{display:flex;align-items:baseline;gap:10px;margin:28px 0 12px}
+  .sect-head h3{font-size:14.5px;font-weight:650}
+  .sect-head .hint{font-size:11.5px;color:var(--mute)}
+
+  /* 价值流：按阶段分列 */
+  .valflow{display:flex;gap:0;overflow-x:auto;padding-bottom:10px}
+  .vcol{flex:0 0 250px;padding:0 10px 0 0;position:relative}
+  .vcol:not(:last-child)::after{
+    content:'';position:absolute;right:2px;top:34px;bottom:8px;width:1px;
+    background:linear-gradient(180deg,var(--line),transparent);
+  }
+  .vcol h4{
+    font-size:11px;color:var(--mute);font-weight:650;letter-spacing:.5px;
+    padding:0 0 9px 2px;text-transform:uppercase;
+  }
+  .vnode{
+    display:block;width:100%;text-align:left;background:var(--panel);
+    border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:7px;
+    font:inherit;font-size:12.2px;color:var(--ink);cursor:pointer;line-height:1.45;
+    transition:border-color .14s,box-shadow .14s,transform .14s;
+  }
+  .vnode:hover{border-color:#b9c9e4;box-shadow:0 4px 14px rgba(23,32,47,.09);transform:translateY(-1px)}
+  .vnode .r{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:10.5px;color:var(--mute)}
+  .vnode .pdot{width:5px;height:5px;border-radius:50%;flex:none}
+  .vnode.is-sub{border-style:dashed;background:#fbfcfe}
+  .vnode.is-sub .go{color:var(--brand);font-size:10.5px;font-weight:600}
+  .vnode.is-dec{background:#fffdf5;border-color:#f0dfb4}
+
+  /* 角色卡 */
+  .rolegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:10px}
+  .rolecard{
+    background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 14px;
+    cursor:pointer;transition:border-color .14s,box-shadow .14s;text-align:left;font:inherit;
+  }
+  .rolecard:hover{border-color:#b9c9e4;box-shadow:0 4px 14px rgba(23,32,47,.09)}
+  .rolecard .top{display:flex;align-items:center;gap:7px;font-size:12.8px;font-weight:600}
+  .rolecard .top i{width:8px;height:8px;border-radius:50%;flex:none}
+  .rolecard .num{margin-top:7px;font-size:11.5px;color:var(--mute)}
+  .rolecard .num b{color:var(--ink);font-weight:650;font-size:14px}
+
+  /* 问题摘要条 */
+  .alertbar{
+    display:flex;align-items:center;gap:12px;background:#fff8f8;border:1px solid #f3d3da;
+    border-radius:11px;padding:12px 15px;margin-top:8px;cursor:pointer;
+  }
+  .alertbar.ok{background:#f4fbf6;border-color:#cfe8d8}
+  .alertbar b{font-size:12.8px}
+  .alertbar span{font-size:11.5px;color:var(--ink2)}
+  .alertbar .arrow{margin-left:auto;color:var(--mute);font-size:15px}
+
+  /* ---------------- 索引页 ---------------- */
+  .filters{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:16px 0 18px}
+  .search{
+    flex:1 1 260px;display:flex;align-items:center;gap:8px;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:220px;
+  }
+  .search input{border:0;outline:0;font:inherit;font-size:12.8px;flex:1;background:transparent;color:var(--ink)}
+  .search svg{width:14px;height:14px;color:var(--mute);flex:none}
+  .sel{position:relative}
+  .sel > button{
+    border:1px solid var(--line);background:var(--panel);font:inherit;font-size:12.3px;color:var(--ink2);
+    padding:8px 12px;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:6px;
+  }
+  .sel > button.on{border-color:var(--brand);color:var(--brand);background:#f5f8ff}
+  .sel .pop{
+    position:absolute;top:calc(100% + 6px);left:0;z-index:40;min-width:200px;max-height:300px;overflow-y:auto;
+    background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow2);padding:5px;
+  }
+  .sel .pop label{display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:7px;font-size:12.3px;cursor:pointer}
+  .sel .pop label:hover{background:#f5f7fb}
+  .sel .pop input{margin:0;accent-color:var(--brand)}
+  .sel .pop .cnt{margin-left:auto;color:var(--faint);font-size:11px}
+  .clear{border:0;background:transparent;color:var(--mute);font:inherit;font-size:11.5px;cursor:pointer;text-decoration:underline}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+  .fcard{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 16px;
+    cursor:pointer;transition:border-color .14s,box-shadow .14s,transform .14s;position:relative;
+  }
+  .fcard:hover{border-color:#b9c9e4;box-shadow:0 6px 18px rgba(23,32,47,.1);transform:translateY(-1px)}
+  .fcard h3{font-size:13.8px;font-weight:650;display:flex;align-items:center;gap:7px}
+  .fcard .main-tag{font-size:9.5px;font-weight:700;background:#eef4ff;color:var(--brand);padding:1.5px 6px;border-radius:5px;letter-spacing:.3px}
+  .fcard p{font-size:11.8px;color:var(--ink2);margin-top:7px;line-height:1.6;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .fcard .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .tag{font-size:10px;padding:1.5px 7px;border-radius:20px;background:#f1f4f9;color:#4d5b73;white-space:nowrap}
+  .tag.sys{background:#f0f7ff;color:#2c5fa8}
+  .fcard .hit{margin-top:9px;font-size:10.8px;color:var(--warn);background:#fffbeb;border-radius:6px;padding:4px 8px}
+  .empty{text-align:center;padding:50px 0;color:var(--mute);font-size:12.5px}
+
+  /* ---------------- 流程详情 ---------------- */
+  .flowbar{
+    position:fixed;left:0;right:0;top:58px;height:46px;z-index:50;
+    display:flex;align-items:center;gap:10px;padding:0 18px;
+    background:rgba(255,255,255,.96);border-bottom:1px solid var(--line);
+  }
+  .crumb{display:flex;align-items:center;gap:5px;font-size:12.2px;color:var(--mute);min-width:0;flex-wrap:nowrap;overflow:hidden}
+  .crumb a{color:var(--ink2);white-space:nowrap}
+  .crumb a:hover{color:var(--brand)}
+  .crumb .sep{color:#c7d0de}
+  .crumb .cur{color:var(--ink);font-weight:620;white-space:nowrap}
+  .back{border:1px solid var(--line);background:#fff;font:inherit;font-size:11.8px;color:var(--ink2);
+    padding:5px 10px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;flex:none}
+  .back:hover{border-color:#c3d0e4;color:var(--brand)}
+  .phasechips{display:flex;gap:3px;margin-left:auto;background:#f1f4f9;padding:3px;border-radius:9px;overflow:hidden}
+  .phasechips button{border:0;background:transparent;font:inherit;font-size:11.5px;color:var(--ink2);
+    padding:4px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
+  .phasechips button.on{background:#fff;color:var(--brand);font-weight:600;box-shadow:0 1px 3px rgba(23,32,47,.1)}
+  .toolbtn{border:1px solid var(--line);background:#fff;font:inherit;font-size:11.8px;color:var(--ink2);
+    padding:6px 11px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;flex:none}
+  .toolbtn:hover{border-color:#c3d0e4}
+  .toolbtn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .toolbtn svg{width:12px;height:12px}
+
+  #laneBar{position:fixed;left:0;right:0;top:104px;height:32px;z-index:45;
+    background:rgba(255,255,255,.95);border-bottom:1px solid var(--line);overflow:hidden;pointer-events:none}
+  #laneBar i{position:absolute;top:0;height:32px;display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:650;font-style:normal;letter-spacing:.3px;border-right:1px solid rgba(0,0,0,.04)}
+  #viewport{position:fixed;inset:136px 0 0 0;overflow:hidden;cursor:grab}
+  #viewport.dragging{cursor:grabbing}
+  #viewport.on{right:376px}
+  #stage{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+  #canvas{position:relative}
+  #wires{position:absolute;inset:0;overflow:visible;pointer-events:none}
+  #wires path{fill:none;stroke:#9aa8bd;stroke-width:1.5}
+  #wires path.live{stroke:#e11d48;stroke-width:2.2}
+  #wires path.hot{stroke:#2563eb;stroke-width:2}
+  #wires path.dim{opacity:.12}
+  #wires path.back{stroke-dasharray:5 4}
+  .elabel{position:absolute;transform:translate(-50%,-50%);z-index:4;font-size:10px;color:#7b879b;
+    background:rgba(255,255,255,.94);padding:1px 5px;border-radius:5px;pointer-events:none;white-space:nowrap}
+  .band{position:absolute;pointer-events:none;border-radius:7px}
+  .band b{position:absolute;left:2px;top:0;transform:translateY(-100%);font-size:10.5px;color:#93a0b4;
+    font-weight:650;letter-spacing:.5px;padding-bottom:5px}
+  .lane{position:absolute;top:0;pointer-events:none}
+
+  .node{position:absolute;width:206px;cursor:grab;user-select:none;z-index:5;transition:opacity .3s,filter .18s}
+  .node .shp{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .node .shp *{stroke-width:1.4;transition:stroke .15s,fill .15s}
+  .node .txt{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;padding:0 15px;gap:2px}
+  .node .t{font-size:12.3px;line-height:1.34;font-weight:550;color:var(--ink)}
+  .node .m{font-size:9.8px;color:var(--mute);line-height:1.25;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .node .idx{position:absolute;left:0;top:50%;transform:translate(-50%,-50%);z-index:3;min-width:18px;height:18px;
+    padding:0 5px;border-radius:9px;background:var(--ink);color:#fff;font-size:10px;font-weight:700;
+    display:flex;align-items:center;justify-content:center}
+  .node.t-start .shp rect{fill:#e9f7ef;stroke:#5ba97f}
+  .node.t-start .t{color:#14532d;font-weight:600}
+  .node.t-start .idx{background:#14532d}
+  .node.t-end .shp rect{fill:#eef1f5;stroke:#8194ab}
+  .node.t-end .t{color:#334155;font-weight:600}
+  .node.t-end .idx{background:#475569}
+  .node.t-proc .shp rect{fill:#fff;stroke:#9aa8bd}
+  .node.t-dec .shp polygon{fill:#fff9e8;stroke:#dfa733}
+  .node.t-dec .txt{padding:0 32px}
+  .node.t-dec .t{font-size:11.6px;color:#7a4a08;font-weight:600}
+  .node.t-dec .m{display:none}
+  .node.t-data .shp polygon{fill:#eaf3fd;stroke:#5b8fd6}
+  .node.t-db .shp path,.node.t-db .shp ellipse{fill:#f5f0fd;stroke:#8b6fc4}
+  .node.t-sub .shp rect{fill:#f7f9ff;stroke:#6b82b8}
+  .node.t-sub .shp line{stroke:#6b82b8;stroke-width:1.2}
+  .node.t-sub .t{color:#2d3f66}
+  .node:hover{filter:drop-shadow(0 5px 13px rgba(23,32,47,.14));z-index:9}
+  .node.ghost{opacity:.13;pointer-events:none;filter:saturate(.12)}
+  .node.sel{z-index:18;filter:drop-shadow(0 8px 18px rgba(15,23,42,.2))}
+  .node.sel .shp rect,.node.sel .shp polygon,.node.sel .shp path,.node.sel .shp ellipse{stroke:#0f172a;stroke-width:2}
+  .node.playing{z-index:20;filter:drop-shadow(0 8px 20px rgba(225,29,72,.32))}
+  .node.playing .shp rect,.node.playing .shp polygon,.node.playing .shp path,.node.playing .shp ellipse{stroke:#e11d48;stroke-width:2.2}
+  .node.flash{animation:flash 1.4s ease-out}
+  @keyframes flash{0%,100%{filter:none}20%,60%{filter:drop-shadow(0 0 0 6px rgba(37,99,235,.35))}}
+
+  #tip{position:fixed;z-index:70;max-width:308px;background:#fff;border:1px solid var(--line);
+    border-radius:11px;box-shadow:var(--shadow2);padding:11px 13px 10px;pointer-events:none;
+    opacity:0;transition:opacity .14s}
+  #tip.on{opacity:1}
+  .tip-h{font-size:12.4px;font-weight:650;line-height:1.45;display:flex;gap:6px;align-items:baseline}
+  .tip-no{flex:none;background:var(--ink);color:#fff;font-size:9.8px;font-weight:700;padding:1.5px 6px;border-radius:6px}
+  .tip-m{display:flex;gap:6px;align-items:center;font-size:10.4px;color:var(--mute);margin:6px 0 7px;flex-wrap:wrap}
+  .tip-b{font-size:11.4px;line-height:1.66;color:var(--ink2);border-top:1px dashed var(--line2);padding-top:7px}
+  .tip-sub{margin-top:7px;font-size:10.6px;color:var(--brand);font-weight:600}
+  .chip{font-size:10px;padding:1px 7px;border-radius:20px;background:#eef2fa;color:#41506b}
+
+  aside{position:fixed;right:0;top:104px;bottom:0;width:376px;z-index:65;background:var(--panel);
+    border-left:1px solid var(--line);box-shadow:var(--shadow);transform:translateX(100%);
+    transition:transform .28s;overflow-y:auto;padding:20px 20px 50px}
+  aside.on{transform:none}
+  aside h2{font-size:15.5px;font-weight:650;line-height:1.4;margin:5px 0 4px}
+  .kick{font-size:10.2px;color:var(--brand);font-weight:650;letter-spacing:.6px;text-transform:uppercase}
+  .sec{margin-top:15px}
+  .sec h4{font-size:10.6px;color:var(--mute);font-weight:650;letter-spacing:.5px;margin-bottom:6px}
+  .sec p{font-size:11.9px;line-height:1.72;color:var(--ink2)}
+  .rel{display:flex;flex-direction:column;gap:4px}
+  .rel button{text-align:left;border:1px solid var(--line);background:#fafbfd;font:inherit;font-size:11.4px;
+    color:var(--ink2);padding:6px 9px;border-radius:8px;cursor:pointer;line-height:1.45}
+  .rel button:hover{border-color:#c3d0e4;color:var(--brand)}
+  #close{position:absolute;right:15px;top:15px;border:0;background:#f2f5fa;width:25px;height:25px;
+    border-radius:8px;cursor:pointer;color:var(--mute);font-size:15px;line-height:1}
+  .enter-sub{display:flex;align-items:center;gap:6px;width:100%;margin-top:8px;border:0;border-radius:9px;
+    background:var(--brand);color:#fff;font:inherit;font-size:12px;font-weight:600;padding:9px 12px;cursor:pointer}
+  .enter-sub:hover{background:var(--brand2)}
+
+  .legend{position:fixed;right:20px;bottom:16px;z-index:44;display:flex;gap:13px;flex-wrap:wrap;
+    background:rgba(255,255,255,.93);border:1px solid var(--line);border-radius:11px;padding:7px 12px;
+    font-size:10.6px;color:var(--ink2);box-shadow:var(--shadow)}
+  .legend span{display:inline-flex;align-items:center;gap:4px}
+  .toast{position:fixed;left:50%;top:70px;transform:translate(-50%,-12px);z-index:80;
+    background:rgba(23,32,47,.95);color:#fff;font-size:12.3px;padding:8px 16px;border-radius:24px;
+    opacity:0;pointer-events:none;transition:.26s}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+
+  /* ---------------- 岗位视角 ---------------- */
+  .rolehead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+  .avatar{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;
+    font-size:17px;font-weight:700;color:#fff;flex:none}
+  .bars{display:flex;flex-direction:column;gap:7px;margin-top:6px}
+  .barrow{display:grid;grid-template-columns:150px 1fr 40px;align-items:center;gap:10px;font-size:11.8px}
+  .barrow .nm{color:var(--ink2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .barrow .tr{background:#eef1f6;border-radius:5px;height:16px;overflow:hidden}
+  .barrow .fl{height:100%;border-radius:5px;background:var(--brand);min-width:3px}
+  .barrow .vl{text-align:right;color:var(--ink2);font-weight:600;font-size:11.2px}
+
+  .groupbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:11px;overflow:hidden}
+  .groupbox > .gh{display:flex;align-items:center;gap:9px;padding:11px 15px;border-bottom:1px solid var(--line2);
+    background:#fbfcfe;cursor:pointer}
+  .groupbox > .gh h4{font-size:12.8px;font-weight:650}
+  .groupbox > .gh .n{font-size:11px;color:var(--mute);margin-left:auto}
+  .steps{padding:6px 8px}
+  .step{display:flex;gap:9px;align-items:flex-start;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:12px}
+  .step:hover{background:#f5f8fd}
+  .step .no{flex:none;min-width:18px;height:18px;border-radius:9px;background:#eef1f7;color:#5b6b85;
+    font-size:9.8px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .step .tx{flex:1;line-height:1.45}
+  .step .sy{font-size:10.2px;color:var(--mute);margin-top:2px}
+
+  /* ---------------- 报告页 ---------------- */
+  .issue{display:flex;gap:12px;background:var(--panel);border:1px solid var(--line);
+    border-radius:11px;padding:13px 15px;margin-bottom:9px;cursor:pointer;transition:border-color .14s}
+  .issue:hover{border-color:#c3d0e4}
+  .issue .lv{flex:none;width:3px;border-radius:3px;align-self:stretch}
+  .issue.error .lv{background:#dc2626}
+  .issue.warning .lv{background:#eab308}
+  .issue.info .lv{background:#3b82f6}
+  .issue .bd{flex:1;min-width:0}
+  .issue .hd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .issue .hd b{font-size:12.8px;font-weight:640}
+  .issue .code{font-size:9.2px;font-family:ui-monospace,Menlo,monospace;color:var(--mute);
+    background:#f1f4f9;padding:1px 5px;border-radius:4px}
+  .issue .loc{font-size:10.8px;color:var(--brand)}
+  .issue p{font-size:11.8px;color:var(--ink2);margin-top:5px;line-height:1.66}
+  .issue .fix{margin-left:auto;color:var(--mute);font-size:14px;flex:none;align-self:center}
+
+  @media (max-width:820px){
+    header{height:auto;padding:10px 14px;flex-wrap:wrap;gap:8px}
+    nav.main{width:100%;overflow-x:auto;margin-left:0}
+    main{padding:18px 14px 60px}
+    aside{width:100%;top:0}
+    #viewport.on{right:0}
+    .legend{display:none}
+    .flowbar{top:auto;position:sticky;height:auto;padding:8px 12px;flex-wrap:wrap}
+    #laneBar{display:none}
+    #viewport{position:relative;inset:auto;height:calc(100vh - 210px);margin-top:0}
+    body[data-view="flow"] main{padding:0}
+    aside{position:fixed;top:0}
+    .barrow{grid-template-columns:100px 1fr 32px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="dot"></span><span id="brandTitle">流程工作台</span>
+    <span class="sub" id="brandSub"></span>
+  </div>
+  <nav class="main" id="nav"></nav>
+</header>
+
+<main>
+  <section class="view" id="v-home"></section>
+  <section class="view" id="v-flows"></section>
+
+  <section class="view" id="v-flow">
+    <div class="flowbar">
+      <button class="back" id="btnBack">← 返回</button>
+      <div class="crumb" id="crumb"></div>
+      <div class="phasechips" id="phaseChips"></div>
+      <button class="toolbtn" id="btnFit">适应窗口</button>
+      <button class="toolbtn primary" id="btnPlay">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>演示
+      </button>
+    </div>
+    <div id="laneBar"></div>
+    <div id="viewport"><div id="stage"><div id="canvas">
+      <svg id="wires" width="1400" height="800"></svg>
+    </div></div></div>
+  </section>
+
+  <section class="view" id="v-role"></section>
+  <section class="view" id="v-issues"></section>
+</main>
+
+<div id="tip"></div>
+<div class="toast" id="toast"></div>
+
+<aside id="drawer">
+  <button id="close">×</button>
+  <div id="drBody"></div>
+</aside>
+
+<div class="legend" id="legend">
+  <span><svg width="17" height="10" viewBox="0 0 18 11"><rect x="1" y="1" width="16" height="9" rx="4.5" fill="#e9f7ef" stroke="#5ba97f"/></svg>起止</span>
+  <span><svg width="17" height="10" viewBox="0 0 18 11"><rect x="1" y="1" width="16" height="9" fill="#fff" stroke="#9aa8bd"/></svg>作业</span>
+  <span><svg width="17" height="10" viewBox="0 0 18 11"><polygon points="9,1 17,5.5 9,10 1,5.5" fill="#fff9e8" stroke="#dfa733"/></svg>判断</span>
+  <span><svg width="17" height="10" viewBox="0 0 18 11"><polygon points="4,1 17,1 14,10 1,10" fill="#eaf3fd" stroke="#5b8fd6"/></svg>数据</span>
+  <span><svg width="17" height="10" viewBox="0 0 18 11"><path d="M1,3 L1,8 A8,3 0 0 0 17,8 L17,3" fill="#f5f0fd" stroke="#8b6fc4"/><ellipse cx="9" cy="3" rx="8" ry="2.4" fill="#f5f0fd" stroke="#8b6fc4"/></svg>系统</span>
+  <span><svg width="17" height="10" viewBox="0 0 18 11"><rect x="1" y="1" width="16" height="9" fill="#f7f9ff" stroke="#6b82b8"/><line x1="4" y1="1" x2="4" y2="10" stroke="#6b82b8"/><line x1="14" y1="1" x2="14" y2="10" stroke="#6b82b8"/></svg>子流程</span>
+</div>
+
+<script>
+/*__WORKBENCH_DATA__*/
+
+/* =========================================================
+   0. 索引与小工具
+   ========================================================= */
+const $  = (s,r)=> (r||document).querySelector(s);
+const $$ = (s,r)=> [...(r||document).querySelectorAll(s)];
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const FLOWS = D.flows;
+const FLOW  = Object.fromEntries(FLOWS.map(f=>[f.id,f]));
+const NODE  = {}, NODE_FLOW = {};
+FLOWS.forEach(f=>(f.nodes||[]).forEach(n=>{ NODE[n.id]=n; NODE_FLOW[n.id]=f.id; }));
+const ROLES = (D.dictionaries.roles||[]);
+const ROLE  = Object.fromEntries(ROLES.map(r=>[r.id,r]));
+const SYS   = Object.fromEntries((D.dictionaries.systems||[]).map(s=>[s.id,s]));
+const DEPT  = Object.fromEntries((D.dictionaries.departments||[]).map(d=>[d.id,d]));
+const MAIN  = FLOWS.find(f=>f.role==='main') || FLOWS[0];
+
+const roleName = id => (ROLE[id]&&ROLE[id].name) || id || '—';
+const sysName  = id => (SYS[id]&&SYS[id].name) || id || '—';
+const deptName = id => (DEPT[id]&&DEPT[id].name) || id || '';
+const roleColor= id => (ROLE[id]&&ROLE[id].color) || '#64748b';
+
+const nodeCount = f => (f.nodes||[]).length;
+const flowRoles = f => [...new Set((f.nodes||[]).map(n=>n.role).filter(Boolean))];
+const flowSystems = f => [...new Set((f.nodes||[]).map(n=>n.system).filter(Boolean))];
+const roleNodesIn = (f,rid) => (f.nodes||[]).filter(n=>n.role===rid);
+const roleFlows = rid => FLOWS.filter(f=>roleNodesIn(f,rid).length>0);
+
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'),2100);
+}
+
+/* =========================================================
+   1. 布局引擎：拓扑分层 → 坐标
+   ---------------------------------------------------------
+   泳道定 x，步序定 y。回边（如"换货后重新到货"）先 DFS 标出来，
+   不参与分层，否则会把下游节点的 y 推到无穷远。
+   ========================================================= */
+const NW=206, NH=56, DEC_H=96, LANE_W=258, PAD_X=34, PAD_Y=48, GAP_Y=102;
+const nodeH = n => n.type==='dec' ? DEC_H : NH;
+
+function layout(flow){
+  const nodes = flow.nodes||[], edges = flow.edges||[];
+  const lanes = (flow.lanes&&flow.lanes.length) ? flow.lanes : flowRoles(flow);
+  const laneIdx = Object.fromEntries(lanes.map((r,i)=>[r,i]));
+
+  /* ① DFS 标回边 */
+  const color={}, back=new Set();
+  const out={}; edges.forEach(e=>{ (out[e.from]=out[e.from]||[]).push(e); });
+  (function walk(id){
+    color[id]=1;
+    (out[id]||[]).forEach(e=>{
+      if(color[e.to]===1) back.add(e);
+      else if(!color[e.to]) walk(e.to);
+    });
+    color[id]=2;
+  })(nodes[0] ? nodes[0].id : '');
+
+  /* ② 最长路径分层（只走非回边） */
+  const step={}; nodes.forEach(n=>step[n.id]=0);
+  const fwd = edges.filter(e=>!back.has(e));
+  for(let i=0;i<nodes.length;i++) fwd.forEach(e=>{
+    if(step[e.to] < step[e.from]+1) step[e.to]=step[e.from]+1;
+  });
+
+  /* ③ 定坐标 */
+  const pos={}, occupied={};
+  let maxStep=0;
+  nodes.forEach(n=>{
+    const li = laneIdx[n.lane]!=null ? laneIdx[n.lane] : 0;
+    const s = step[n.id]||0;
+    maxStep = Math.max(maxStep,s);
+    const key = li+':'+s;
+    const k = occupied[key]=(occupied[key]||0)+1;
+    pos[n.id] = {
+      x: PAD_X + LANE_W/2 + li*LANE_W + (k>1 ? (k-1)*34*(k%2?1:-1) : 0),
+      y: PAD_Y + s*GAP_Y + (k>1 ? (k-1)*30 : 0),
+      step: s
+    };
+  });
+
+  /* ④ 阶段带：按该阶段节点的 step 范围 */
+  const phases = (flow.phases||[]).map(p=>{
+    const ss = nodes.filter(n=>n.phase===p.id).map(n=>step[n.id]||0);
+    const a = ss.length ? Math.min(...ss) : 0, b = ss.length ? Math.max(...ss) : 0;
+    return {...p, y1: PAD_Y + a*GAP_Y - 40, y2: PAD_Y + b*GAP_Y + 42};
+  });
+
+  const w = PAD_X*2 + lanes.length*LANE_W;
+  const h = PAD_Y*2 + maxStep*GAP_Y + 40;
+
+  return {
+    pos, step, phases, back,
+    lanes: lanes.map((rid,i)=>({
+      rid, name: roleName(rid), color: roleColor(rid),
+      x: PAD_X + i*LANE_W, w: LANE_W
+    })),
+    w, h
+  };
+}
+
+/* =========================================================
+   2. 路由
+   ========================================================= */
+let trail = [];          // 跨流程跳转的返回栈
+let curFlowId = null;    // 当前画布上的流程
+let curLayout = null;
+let curPhase = 'all';
+let playTimer = null, playList = [], playIdx = 0;
+
+function parseHash(){
+  const h = decodeURIComponent(location.hash.replace(/^#\/?/,'')) || 'home';
+  const [path,qs] = h.split('?');
+  const seg = path.split('/').filter(Boolean);
+  return { view: seg[0]||'home', id: seg[1]||null, q: new URLSearchParams(qs||'') };
+}
+function go(hash){
+  if(location.hash===hash){ router(); }
+  else location.hash = hash;
+}
+
+function router(){
+  const r = parseHash();
+  const names = {home:'总览', flows:'流程索引', role:'岗位视角', issues:'一致性检查'};
+  const active = (r.view==='flow') ? 'flows' : r.view;
+  $$('#nav button').forEach(b=>b.classList.toggle('on', b.dataset.k===active));
+
+  $$('.view').forEach(v=>v.classList.remove('on'));
+  document.body.dataset.view = r.view;
+  $('#legend').style.display = r.view==='flow' ? '' : 'none';
+  /* 切视图时收起抽屉与提示，避免上个流程的状态漏到新视图 */
+  drawer.classList.remove('on'); vp.classList.remove('on'); hideTip();
+
+  if(r.view==='home'){ $('#v-home').classList.add('on'); renderHome(); }
+  else if(r.view==='flows'){ $('#v-flows').classList.add('on'); renderIndex(); }
+  else if(r.view==='flow'){ $('#v-flow').classList.add('on'); renderFlow(r.id, r.q.get('n')); }
+  else if(r.view==='role'){ $('#v-role').classList.add('on'); renderRole(r.id||ROLES[0].id); }
+  else if(r.view==='issues'){ $('#v-issues').classList.add('on'); renderIssues(); }
+  else { $('#v-home').classList.add('on'); renderHome(); }
+  if(playTimer) stopPlay();
+  window.scrollTo(0,0);
+}
+
+/* =========================================================
+   3. 首页总览
+   ========================================================= */
+function renderHome(){
+  const st = D.stats;
+  const errs = D.issues.filter(i=>i.level==='error').length;
+  const warns = D.issues.filter(i=>i.level==='warning').length;
+
+  /* 主流程按阶段分列 */
+  const pos = layout(MAIN).pos;
+  const cols = (MAIN.phases||[]).map(p=>{
+    const ns = (MAIN.nodes||[]).filter(n=>n.phase===p.id).sort((a,b)=>(pos[a.id].step-pos[b.id].step)||(pos[a.id].x-pos[b.id].x));
+    return `<div class="vcol"><h4>${esc(p.name)}</h4>${ns.map(n=>{
+      const isSub = n.type==='sub' && n.sub && FLOW[n.sub.flow];
+      return `<button class="vnode ${isSub?'is-sub':''} ${n.type==='dec'?'is-dec':''}" data-n="${n.id}">
+        ${esc(n.text)}
+        <div class="r"><i class="pdot" style="background:${roleColor(n.role)}"></i>${esc(roleName(n.role))}
+        ${n.system?`<span>· ${esc(sysName(n.system))}</span>`:''}
+        ${isSub?`<span class="go" style="margin-left:auto">进入子流程 →</span>`:''}</div>
+      </button>`;
+    }).join('')}</div>`;
+  }).join('');
+
+  const roleCards = ROLES.map(r=>{
+    const fs = roleFlows(r.id), cnt = fs.reduce((s,f)=>s+roleNodesIn(f,r.id).length,0);
+    return `<button class="rolecard" data-role="${r.id}">
+      <div class="top"><i style="background:${r.color||'#64748b'}"></i>${esc(r.name)}</div>
+      <div class="num"><b>${cnt}</b> 个动作 · 分布在 <b>${fs.length}</b> 张流程</div>
+    </button>`;
+  }).join('');
+
+  $('#v-home').innerHTML = `
+    <div class="hero">
+      <div class="txt">
+        <h1 class="page">${esc(D.meta.title||'流程工作台')}</h1>
+        <p class="lede">${esc(D.meta.subtitle||'')}<br>
+        从主干进入，点开子流程，再按岗位看这个人到底要做什么。所有流程共用一套角色与系统口径。</p>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><b>${st.flows}</b><span>张流程</span></div>
+        <div class="kpi"><b>${st.nodes}</b><span>个动作</span></div>
+        <div class="kpi"><b>${st.roles}</b><span>个角色</span></div>
+        <div class="kpi ${errs?'bad':''}"><b>${errs+warns}</b><span>处待确认</span></div>
+      </div>
+    </div>
+
+    <div class="alertbar ${errs?'':'ok'}" data-go="#/issues">
+      <b>${errs?`${errs} 处错误`:'没有断链'}</b>
+      <span>${errs?`另有 ${warns} 处警告，建议交付前处理`:'术语与职责共有 '+warns+' 处警告，可逐条确认'}</span>
+      <span class="arrow">→</span>
+    </div>
+
+    <div class="sect-head"><h3>主业务流程</h3><span class="hint">${esc(MAIN.name)} · 点击节点看说明，虚框节点可进入子流程</span></div>
+    <div class="valflow">${cols}</div>
+
+    <div class="sect-head"><h3>按岗位进入</h3><span class="hint">看这个人在全部流程里要处理多少次</span></div>
+    <div class="rolegrid">${roleCards}</div>
+  `;
+
+  $$('#v-home .vnode').forEach(b=>b.onclick=()=>{
+    const n = NODE[b.dataset.n];
+    if(n.type==='sub' && n.sub && FLOW[n.sub.flow]) enterSub(n.sub.flow, n.sub.node);
+    else go(`#/flow/${MAIN.id}?n=${n.id}`);
+  });
+  $$('#v-home .rolecard').forEach(b=>b.onclick=()=>go(`#/role/${b.dataset.role}`));
+  $$('#v-home .alertbar').forEach(b=>b.onclick=()=>go('#/issues'));
+}
+
+/* =========================================================
+   4. 流程索引
+   ========================================================= */
+const F = { q:'', dept:new Set(), role:new Set(), sys:new Set() };
+
+function renderIndex(){
+  const counts = {dept:{}, role:{}, sys:{}};
+  FLOWS.forEach(f=>{
+    if(f.dept) counts.dept[f.dept]=(counts.dept[f.dept]||0)+1;
+    flowRoles(f).forEach(r=>counts.role[r]=(counts.role[r]||0)+1);
+    flowSystems(f).forEach(s=>counts.sys[s]=(counts.sys[s]||0)+1);
+  });
+
+  const dropdown = (key,label,items,countsObj) => `
+    <div class="sel" data-sel="${key}">
+      <button class="${F[key].size?'on':''}">${label}${F[key].size?` · ${F[key].size}`:''} ▾</button>
+      <div class="pop" hidden>
+        ${items.map(([id,name])=>`<label><input type="checkbox" value="${id}" ${F[key].has(id)?'checked':''}>${esc(name)}
+          <span class="cnt">${countsObj[id]||0}</span></label>`).join('')}
+      </div>
+    </div>`;
+
+  $('#v-flows').innerHTML = `
+    <h1 class="page">流程索引</h1>
+    <p class="lede">全部 ${FLOWS.length} 张流程。可以按名称或节点内容搜索，也可以按部门、角色、系统交叉筛选。</p>
+    <div class="filters">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="q" placeholder="搜流程名、说明或节点动作…" value="${esc(F.q)}">
+      </div>
+      ${dropdown('dept','部门',(D.dictionaries.departments||[]).map(d=>[d.id,d.name]),counts.dept)}
+      ${dropdown('role','角色',ROLES.map(r=>[r.id,r.name]),counts.role)}
+      ${dropdown('sys','系统',(D.dictionaries.systems||[]).map(s=>[s.id,s.name]),counts.sys)}
+      <button class="clear" id="clr">清空筛选</button>
+    </div>
+    <div id="cardbox"></div>
+  `;
+
+  /* 搜索 */
+  const q = $('#q');
+  q.oninput = ()=>{ F.q=q.value.trim(); paint(); };
+  $('#clr').onclick = ()=>{ F.q=''; F.dept.clear(); F.role.clear(); F.sys.clear(); renderIndex(); };
+
+  /* 下拉 */
+  $$('#v-flows .sel').forEach(sel=>{
+    const key = sel.dataset.sel, btn=sel.querySelector('button'), pop=sel.querySelector('.pop');
+    btn.onclick = ev=>{
+      ev.stopPropagation();
+      $$('#v-flows .pop').forEach(p=>{ if(p!==pop) p.hidden=true; });
+      pop.hidden = !pop.hidden;
+    };
+    pop.onclick = ev=>ev.stopPropagation();
+    pop.oninput = ev=>{
+      const id=ev.target.value;
+      ev.target.checked ? F[key].add(id) : F[key].delete(id);
+      btn.textContent = (key==='dept'?'部门':key==='role'?'角色':'系统') + (F[key].size?` · ${F[key].size}`:'') + ' ▾';
+      btn.classList.toggle('on', F[key].size>0);
+      paint();
+    };
+  });
+  document.onclick = ()=> $$('#v-flows .pop').forEach(p=>p.hidden=true);
+
+  paint();
+
+  function paint(){
+    const kw = F.q.toLowerCase();
+    const list = FLOWS.filter(f=>{
+      if(F.dept.size && !F.dept.has(f.dept)) return false;
+      if(F.role.size && !flowRoles(f).some(r=>F.role.has(r))) return false;
+      if(F.sys.size && !flowSystems(f).some(s=>F.sys.has(s))) return false;
+      if(kw){
+        const hay = (f.name+' '+(f.summary||'')+' '+(f.nodes||[]).map(n=>n.text+' '+(n.note||'')).join(' ')).toLowerCase();
+        if(!hay.includes(kw)) return false;
+      }
+      return true;
+    });
+
+    $('#cardbox').innerHTML = list.length ? `<div class="cards">${list.map(f=>{
+      const hits = kw ? (f.nodes||[]).filter(n=>(n.text+' '+(n.note||'')).toLowerCase().includes(kw)) : [];
+      return `<div class="fcard" data-f="${f.id}">
+        <h3>${esc(f.name)}${f.role==='main'?'<span class="main-tag">主流程</span>':''}</h3>
+        <p>${esc(f.summary||'')}</p>
+        <div class="meta">
+          <span class="tag">${nodeCount(f)} 个动作</span>
+          ${f.dept?`<span class="tag">${esc(deptName(f.dept))}</span>`:''}
+          ${flowRoles(f).slice(0,3).map(r=>`<span class="tag" style="background:${roleColor(r)}18;color:${roleColor(r)}">${esc(roleName(r))}</span>`).join('')}
+          ${flowSystems(f).map(s=>`<span class="tag sys">${esc(sysName(s))}</span>`).join('')}
+        </div>
+        ${hits.length?`<div class="hit">命中 ${hits.length} 处：${hits.slice(0,2).map(n=>esc(n.text)).join('、')}${hits.length>2?'…':''}</div>`:''}
+      </div>`;
+    }).join('')}</div>` : `<div class="empty">没有符合条件的流程，试着放宽筛选。</div>`;
+
+    $$('#cardbox .fcard').forEach(c=>c.onclick=()=>go(`#/flow/${c.dataset.f}`));
+  }
+}
+
+/* =========================================================
+   5. 流程详情（画布）
+   ========================================================= */
+function enterSub(flowId, nodeId){
+  if(curFlowId && curFlowId!==flowId){
+    const last = trail[trail.length-1];
+    if(!last || last.flow!==curFlowId) trail.push({flow:curFlowId, name:FLOW[curFlowId].name});
+  }
+  go(`#/flow/${flowId}${nodeId?'?n='+nodeId:''}`);
+}
+
+function renderFlow(flowId, focusNode){
+  const flow = FLOW[flowId];
+  if(!flow){ go('#/flows'); return; }
+
+  const isSubJump = !!focusNode && curFlowId && curFlowId!==flowId;
+  if(!isSubJump && !trail.length) curFlowId = flowId;
+  if(!isSubJump && focusNode===null) { /* 直接进入，保持栈 */ }
+  curFlowId = flowId;
+
+  /* 面包屑 */
+  const crumbs = [`<a data-go="#/home">总览</a>`];
+  if(trail.length){
+    trail.forEach(t=>{ crumbs.push(`<a data-go="#/flow/${t.flow}">${esc(t.name)}</a>`); });
+  }
+  crumbs.push(`<span class="cur">${esc(flow.name)}</span>`);
+  $('#crumb').innerHTML = crumbs.join('<span class="sep">/</span>');
+  $$('#crumb a').forEach(a=>a.onclick=()=>{ 
+    const m=a.dataset.go.match(/#\/flow\/(.+)/);
+    if(m) trail = trail.slice(0, trail.findIndex(t=>t.flow===m[1])+1); 
+    go(a.dataset.go); 
+  });
+  $('#btnBack').style.display = trail.length ? '' : 'none';
+  $('#btnBack').onclick = ()=>{
+    const t = trail.pop();
+    go(t ? `#/flow/${t.flow}` : '#/home');
+  };
+
+  /* 阶段筛选 */
+  curPhase='all';
+  $('#phaseChips').innerHTML = ['all',...(flow.phases||[]).map(p=>p.id)].map(id=>
+    `<button data-p="${id}" class="${id==='all'?'on':''}">${id==='all'?'全流程':esc((flow.phases.find(p=>p.id===id)||{}).name||id)}</button>`
+  ).join('');
+  $$('#phaseChips button').forEach(b=>b.onclick=()=>{
+    $$('#phaseChips button').forEach(x=>x.classList.toggle('on',x===b));
+    curPhase=b.dataset.p; applyPhase();
+  });
+
+  curLayout = layout(flow);
+  renderCanvas(flow);
+  requestAnimationFrame(()=>{
+    if(focusNode && NODE[focusNode]){ centerOn(focusNode); select(focusNode,true); }
+    else fitView();
+  });
+}
+
+/* ---- 画布构建 ---- */
+const canvas=$('#canvas'), wires=$('#wires'), stage=$('#stage'), vp=$('#viewport'), laneBar=$('#laneBar');
+let dom={}, view={s:1,x:0,y:0}, laneNodes=[], mounted=null;
+
+const SVGNS='http://www.w3.org/2000/svg';
+function shapeSVG(n){
+  const W=NW, H=nodeH(n);
+  const o=`<svg class="shp" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">`;
+  switch(n.type){
+    case 'start': return `${o}<rect x="1" y="1" width="${W-2}" height="${H-2}" rx="${(H-2)/2}"/></svg>`;
+    case 'end':   return `${o}<rect x="1" y="1" width="${W-2}" height="${H-2}" rx="${(H-2)/2}"/></svg>`;
+    case 'dec':   return `${o}<polygon points="${W/2},1.5 ${W-1.5},${H/2} ${W/2},${H-1.5} 1.5,${H/2}"/></svg>`;
+    case 'data':  return `${o}<polygon points="24,1.5 ${W-1.5},1.5 ${W-24},${H-1.5} 1.5,${H-1.5}"/></svg>`;
+    case 'db':    return `${o}<path d="M1.5,10 L1.5,${H-10} A${W/2-1.5},9 0 0 0 ${W-1.5},${H-10} L${W-1.5},10"/>`+
+                         `<ellipse cx="${W/2}" cy="10" rx="${W/2-1.5}" ry="9"/></svg>`;
+    case 'sub':   return `${o}<rect x="1.5" y="1.5" width="${W-3}" height="${H-3}"/>`+
+                         `<line x1="13" y1="1.5" x2="13" y2="${H-1.5}"/><line x1="${W-13}" y1="1.5" x2="${W-13}" y2="${H-1.5}"/></svg>`;
+    default:      return `${o}<rect x="1.5" y="1.5" width="${W-3}" height="${H-3}" rx="2"/></svg>`;
+  }
+}
+function defs(){
+  const d=document.createElementNS(SVGNS,'defs');
+  [['ar','#9aa8bd'],['ar-hot','#2563eb'],['ar-live','#e11d48']].forEach(([id,c])=>{
+    const m=document.createElementNS(SVGNS,'marker');
+    m.setAttribute('id',id); m.setAttribute('viewBox','0 0 10 10');
+    m.setAttribute('refX','9'); m.setAttribute('refY','5');
+    m.setAttribute('markerWidth','7'); m.setAttribute('markerHeight','7');
+    m.setAttribute('orient','auto-start-reverse');
+    const p=document.createElementNS(SVGNS,'path');
+    p.setAttribute('d','M0,0 L10,5 L0,10 z'); p.setAttribute('fill',c);
+    m.appendChild(p); d.appendChild(m);
+  });
+  wires.appendChild(d);
+}
+
+function renderCanvas(flow){
+  mounted = {flow, L:curLayout};
+  dom={};
+  canvas.innerHTML='';
+  wires.innerHTML='';
+  canvas.appendChild(wires);
+  wires.setAttribute('width',curLayout.w); wires.setAttribute('height',curLayout.h);
+  canvas.style.width=curLayout.w+'px'; canvas.style.height=curLayout.h+'px';
+  defs();
+
+  /* 泳道底 */
+  curLayout.lanes.forEach(ln=>{
+    const d=document.createElement('div');
+    d.className='lane';
+    d.style.cssText=`left:${ln.x}px;width:${ln.w}px;height:${curLayout.h}px;background:${ln.rid===curLayout.lanes[0].rid?'#f4f7fd':'#eef3fa'}`;
+    canvas.appendChild(d);
+  });
+  /* 阶段带 */
+  curLayout.phases.forEach(p=>{
+    const b=document.createElement('div');
+    b.className='band';
+    b.style.cssText=`left:${PAD_X-14}px;right:${PAD_X-14}px;top:${p.y1}px;height:${p.y2-p.y1}px;background:#eff6ff;opacity:.55`;
+    b.innerHTML=`<b>${esc(p.name)}</b>`;
+    canvas.appendChild(b);
+  });
+  /* 节点 */
+  flow.nodes.forEach((n,ni)=>{
+    const p=curLayout.pos[n.id];
+    const el=document.createElement('div');
+    el.className='node t-'+n.type;
+    el.style.left=(p.x-NW/2)+'px';
+    el.style.top =(p.y-nodeH(n)/2)+'px';
+    el.style.height=nodeH(n)+'px';
+    el.innerHTML = shapeSVG(n)
+      + `<span class="idx">${ni+1}</span>`
+      + `<div class="txt"><div class="t">${esc(n.text)}</div>`
+      + (n.system&&n.type!=='dec'?`<div class="m">${esc(sysName(n.system))}</div>`:'')
+      + `</div>`;
+    canvas.appendChild(el);
+    dom[n.id]=el;
+    bindNode(n,el);
+  });
+  drawWires();
+  buildLaneBar();
+  apply();
+}
+
+function pathOf(a,b,isBack){
+  const dx=b.x-a.x, dy=b.y-a.y;
+  const ah=nodeH(a), bh=nodeH(b);
+  if(Math.abs(dx)<26){
+    const s=dy>=0?1:-1;
+    const off=isBack?40:(dy<0?34:0);
+    const ax=a.x+off, bx=b.x+off;
+    const y1=a.y+s*ah/2, y2=b.y-s*bh/2;
+    return `M${ax},${y1} C${ax},${y1+(y2-y1)*.45} ${bx},${y2-(y2-y1)*.45} ${bx},${y2}`;
+  }
+  if(Math.abs(dy)<26){
+    const sx=Math.sign(dx)||1;
+    const x1=a.x+NW/2*sx, x2=b.x-NW/2*sx;
+    return `M${x1},${a.y} C${x1+(x2-x1)*.45},${a.y} ${x2-(x2-x1)*.45},${b.y} ${x2},${b.y}`;
+  }
+  const y1=a.y+ah/2, ym=y1+26, y2=b.y-bh/2;
+  return `M${a.x},${y1} L${a.x},${ym-8} Q${a.x},${ym} ${a.x+8},${ym} L${b.x-8},${ym} Q${b.x},${ym} ${b.x},${ym+8} L${b.x},${y2}`;
+}
+
+function drawWires(){
+  [...wires.querySelectorAll('path,.elabel')].forEach(x=>x.remove());
+  mounted.flow.edges.forEach(e=>{
+    const a=curLayout.pos[e.from], b=curLayout.pos[e.to];
+    if(!a||!b) return;
+    const na=NODE[e.from], nb=NODE[e.to];
+    const isBack=mounted.L.back.has(e);
+    const p=document.createElementNS(SVGNS,'path');
+    p.setAttribute('d',pathOf({...a,...na},{...b,...nb},isBack));
+    p.setAttribute('marker-end','url(#ar)');
+    if(isBack) p.classList.add('back');
+    p.dataset.f=e.from; p.dataset.t=e.to;
+    wires.appendChild(p);
+    e._el=p;
+    if(e.label){
+      const s=(b.y-a.y)>=0?1:-1;
+      const off=isBack?40:((b.y-a.y)<0?34:0);
+      const ax=a.x+off, ay=a.y+s*nodeH(na)/2;
+      const bx=b.x+off, by=b.y-s*nodeH(nb)/2;
+      const lb=document.createElement('div');
+      lb.className='elabel'; lb.textContent=e.label;
+      lb.style.left=(ax+(bx-ax)*.34)+'px';
+      lb.style.top =(ay+(by-ay)*.34)+'px';
+      canvas.appendChild(lb); e._lb=lb;
+    }
+  });
+}
+
+/* ---- 变换 ---- */
+function apply(){
+  stage.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.s})`;
+  syncLaneBar();
+}
+function bounds(){
+  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
+  mounted.flow.nodes.forEach(n=>{
+    if(dom[n.id].classList.contains('ghost')) return;
+    const p=curLayout.pos[n.id];
+    x1=Math.min(x1,p.x-NW/2); x2=Math.max(x2,p.x+NW/2);
+    y1=Math.min(y1,p.y-nodeH(n)/2); y2=Math.max(y2,p.y+nodeH(n)/2);
+  });
+  if(x1>x2) return {x:0,y:0,w:1200,h:600};
+  return {x:x1-40,y:y1-52,w:x2-x1+80,h:y2-y1+104};
+}
+function fitView(){
+  const b=bounds(), box=vp.getBoundingClientRect();
+  const sW=box.width/b.w, sH=(box.height-26)/b.h;
+  /* 宽度优先：流程图天然是长条，高度不够就让用户纵向拖动，
+     也比把文字缩到看不清强。上限 0.85 防止小流程放得过大。 */
+  let s=Math.min(sW, sH, 1.12);
+  if(sH<0.62) s=Math.min(sW, 0.85);
+  view.s=s;
+  view.x=(box.width-b.w*s)/2 - b.x*s;
+  view.y = (b.h*s<=box.height-26)
+    ? (box.height-b.h*s)/2 + 12 - b.y*s
+    : 18 - b.y*s;
+  apply();
+}
+function centerOn(id){
+  const p=curLayout.pos[id]; if(!p) return;
+  const box=vp.getBoundingClientRect();
+  view.x=box.width/2 - p.x*view.s;
+  view.y=box.height/2 - p.y*view.s;
+  apply();
+}
+function buildLaneBar(){
+  laneBar.innerHTML=''; laneNodes=[];
+  curLayout.lanes.forEach(ln=>{
+    const i=document.createElement('i');
+    i.textContent=ln.name;
+    i.style.background=ln.color+'1f';
+    i.style.color='#41506b';
+    laneBar.appendChild(i); laneNodes.push({el:i,ln});
+  });
+}
+function syncLaneBar(){
+  laneNodes.forEach(({el,ln})=>{
+    el.style.left=(view.x+ln.x*view.s)+'px';
+    el.style.width=(ln.w*view.s)+'px';
+    const f=Math.max(.55,Math.min(1,view.s));
+    el.style.fontSize=(11*f)+'px';
+    el.style.opacity=view.s<.26?0:1;
+  });
+}
+vp.addEventListener('wheel',ev=>{
+  ev.preventDefault();
+  const box=vp.getBoundingClientRect();
+  const mx=ev.clientX-box.left, my=ev.clientY-box.top;
+  const s2=Math.max(.16,Math.min(2.2,view.s*(ev.deltaY<0?1.09:1/1.09)));
+  view.x=mx-(mx-view.x)*(s2/view.s);
+  view.y=my-(my-view.y)*(s2/view.s);
+  view.s=s2; apply();
+},{passive:false});
+
+let pan=null;
+vp.addEventListener('pointerdown',ev=>{
+  if(ev.target.closest('.node')) return;
+  pan={sx:ev.clientX,sy:ev.clientY,ox:view.x,oy:view.y};
+  vp.classList.add('dragging');
+});
+addEventListener('pointermove',ev=>{
+  if(!pan) return;
+  view.x=pan.ox+(ev.clientX-pan.sx);
+  view.y=pan.oy+(ev.clientY-pan.sy);
+  apply();
+});
+addEventListener('pointerup',()=>{ pan=null; vp.classList.remove('dragging'); });
+
+/* ---- 节点交互 ---- */
+function bindNode(n,el){
+  let drag=null, moved=false;
+  el.addEventListener('pointerdown',ev=>{
+    ev.stopPropagation();
+    drag={sx:ev.clientX,sy:ev.clientY,ox:curLayout.pos[n.id].x,oy:curLayout.pos[n.id].y};
+    moved=false; el.setPointerCapture(ev.pointerId);
+    el.style.cursor='grabbing'; el.style.zIndex=30;
+  });
+  el.addEventListener('pointermove',ev=>{
+    if(!drag) return;
+    const dx=(ev.clientX-drag.sx)/view.s, dy=(ev.clientY-drag.sy)/view.s;
+    if(Math.abs(dx)+Math.abs(dy)>3) moved=true;
+    curLayout.pos[n.id].x=drag.ox+dx;
+    curLayout.pos[n.id].y=drag.oy+dy;
+    el.style.left=(curLayout.pos[n.id].x-NW/2)+'px';
+    el.style.top =(curLayout.pos[n.id].y-nodeH(n)/2)+'px';
+    drawWires();
+  });
+  el.addEventListener('pointerup',()=>{
+    if(!drag) return;
+    el.style.cursor='grab'; el.style.zIndex='';
+    const was=moved; drag=null;
+    if(!was) select(n.id);
+  });
+  el.addEventListener('pointerenter',()=>{ showTip(n); hotWires(n.id,true); });
+  el.addEventListener('pointerleave',()=>{ hideTip(); hotWires(n.id,false); });
+}
+
+const tip=$('#tip');
+function showTip(n){
+  if(pan||playTimer) return;
+  const subs = FLOWS.filter(f=>(f.nodes||[]).some(x=>x.sub&&x.sub.flow===mounted.flow.id&&n.id===x.id));
+  const isSub = n.type==='sub' && n.sub && FLOW[n.sub.flow];
+  tip.innerHTML = `<div class="tip-h"><span class="tip-no">${esc(n.id)}</span>${esc(n.text)}</div>
+    <div class="tip-m"><span class="chip" style="background:${roleColor(n.role)}18;color:${roleColor(n.role)}">${esc(roleName(n.role))}</span>
+      ${n.system?`<span>· ${esc(sysName(n.system))}</span>`:''}</div>
+    <div class="tip-b">${esc(n.note||'')}</div>
+    ${isSub?`<div class="tip-sub">点击进入《${esc(FLOW[n.sub.flow].name)}》 →</div>`:''}`;
+  tip.classList.add('on');
+
+  const r=dom[n.id].getBoundingClientRect();
+  const tw=tip.offsetWidth, th=tip.offsetHeight, gap=14;
+  const roomR=innerWidth-(r.right+gap), roomL=r.left-gap;
+  let x;
+  if(roomR>=tw) x=r.right+gap;
+  else if(roomL>=tw) x=r.left-gap-tw;
+  else if(roomR>=roomL) x=innerWidth-tw-10;
+  else x=10;
+
+  let y=r.top+r.height/2-th/2;
+  y=Math.max(118,Math.min(y,innerHeight-th-10));
+
+  const others=$$('.node:not(.ghost)').map(e=>e.getBoundingClientRect())
+    .filter(o=>!(o.right<x-6||o.left>x+tw+6));
+  const hits=yy=>others.some(o=>{
+    const b={l:x,r:x+tw,t:yy,b:yy+th};
+    return b.l<o.right-4&&b.r>o.left+4&&b.t<o.bottom-4&&b.b>o.top+4;
+  });
+  if(hits(y)){
+    const y0=r.top+r.height/2-th/2, lo=innerHeight-th-10;
+    for(let off=18;off<lo;off+=18){
+      if(y0+off<=lo && !hits(y0+off)){ y=y0+off; break; }
+      if(y0-off>=118 && !hits(y0-off)){ y=y0-off; break; }
+    }
+    y=Math.max(118,Math.min(y,lo));
+  }
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+function hideTip(){ tip.classList.remove('on'); }
+
+function hotWires(id,on){
+  if(playTimer) return;
+  mounted.flow.edges.forEach(e=>{
+    const hit=(e.from===id||e.to===id);
+    if(on){
+      if(hit){ e._el.classList.add('hot'); e._el.setAttribute('marker-end','url(#ar-hot)'); }
+      else e._el.classList.add('dim');
+    }else{
+      e._el.classList.remove('hot','dim');
+      e._el.setAttribute('marker-end','url(#ar)');
+    }
+  });
+}
+
+/* ---- 抽屉 ---- */
+const drawer=$('#drawer');
+function select(id, silent){
+  const n=NODE[id]; if(!n||!dom[id]) return;
+  Object.values(dom).forEach(e=>e.classList.remove('sel'));
+  dom[id].classList.add('sel');
+  drawer.classList.add('on'); vp.classList.add('on');
+  if(!silent) centerOn(id);
+
+  const f=mounted.flow;
+  const up=f.edges.filter(e=>e.to===id), down=f.edges.filter(e=>e.from===id);
+  const isSub = n.type==='sub' && n.sub && FLOW[n.sub.flow];
+  const row=(arr,tag)=>arr.map(e=>{
+    const o=NODE[tag==='up'?e.from:e.to];
+    return `<button data-goto="${o.id}">${tag==='up'?'←':'→'} ${esc(o.id)} ${esc(o.text)}${e.label?` <span style="color:#94a3b8">· ${esc(e.label)}</span>`:''}</button>`;
+  }).join('')||'<span style="font-size:11.5px;color:#a3adbf">无</span>';
+
+  const roleCnt = roleNodesIn(f, n.role).length;
+  $('#drBody').innerHTML=`
+    <div class="kick">${esc((f.phases.find(p=>p.id===n.phase)||{}).name||'')} · ${esc(f.name)}</div>
+    <h2>${esc(n.id)}　${esc(n.text)}</h2>
+    <div class="sec"><h4>责任岗位 / 涉及系统</h4>
+      <p><a data-role="${n.role}" style="color:${roleColor(n.role)};font-weight:600">${esc(roleName(n.role))}</a>
+      ${n.system?` · ${esc(sysName(n.system))}`:''}</p>
+      <p style="color:#8b95a8;font-size:11px;margin-top:3px">该角色在本流程共 ${roleCnt} 个动作</p>
+    </div>
+    <div class="sec"><h4>操作说明</h4><p>${esc(n.note||'—')}</p></div>
+    ${isSub?`<button class="enter-sub" id="goSub">进入《${esc(FLOW[n.sub.flow].name)}》 →</button>`:''}
+    <div class="sec"><h4>上游</h4><div class="rel">${row(up,'up')}</div></div>
+    <div class="sec"><h4>下游</h4><div class="rel">${row(down,'down')}</div></div>
+  `;
+  $$('#drBody [data-goto]').forEach(b=>b.onclick=()=>{ centerOn(b.dataset.goto); select(b.dataset.goto); });
+  const gs=$('#goSub');
+  if(gs) gs.onclick=()=>{ enterSub(n.sub.flow, n.sub.node); };
+  const rl=$('#drBody [data-role]');
+  if(rl) rl.onclick=()=>go(`#/role/${n.role}`);
+}
+$('#close').onclick=()=>{
+  drawer.classList.remove('on'); vp.classList.remove('on');
+  Object.values(dom).forEach(e=>e.classList.remove('sel'));
+};
+
+/* ---- 阶段筛选 ---- */
+function applyPhase(){
+  const f=mounted.flow;
+  f.nodes.forEach(n=>dom[n.id].classList.toggle('ghost', curPhase!=='all'&&n.phase!==curPhase));
+  f.edges.forEach(e=>{
+    const on = curPhase==='all'||(NODE[e.from].phase===curPhase&&NODE[e.to].phase===curPhase);
+    e._el.style.display = on?'':'none';
+    if(e._lb) e._lb.style.display = on?'':'none';
+  });
+  $('#close').click();
+  fitView();
+}
+
+/* ---- 演示 ---- */
+const playBtn=$('#btnPlay');
+function startPlay(){
+  const f=mounted.flow;
+  /* 拓扑顺序：按 step，再按 lane */
+  playList=[...f.nodes].sort((a,b)=>(curLayout.pos[a.id].step-curLayout.pos[b.id].step)||(curLayout.pos[a.id].x-curLayout.pos[b.id].x)).map(n=>n.id);
+  playIdx=0;
+  playBtn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>停止';
+  stepPlay();
+}
+function stepPlay(){
+  Object.values(dom).forEach(e=>e.classList.remove('playing'));
+  mounted.flow.edges.forEach(e=>{ e._el.classList.remove('live'); e._el.setAttribute('marker-end','url(#ar)'); });
+  if(playIdx>=playList.length){ stopPlay(true); return; }
+  const id=playList[playIdx];
+  dom[id].classList.add('playing');
+  centerOn(id);
+  toast(`第 ${playIdx+1}/${playList.length} 步 · ${NODE[id].text}`);
+  playIdx++;
+  playTimer=setTimeout(stepPlay,1200);
+}
+function stopPlay(done){
+  clearTimeout(playTimer); playTimer=null;
+  Object.values(dom).forEach(e=>e.classList.remove('playing'));
+  if(mounted) mounted.flow.edges.forEach(e=>{ e._el.classList.remove('live'); e._el.setAttribute('marker-end','url(#ar)'); });
+  playBtn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>演示';
+  if(done) toast(`演示结束 · 共 ${playList.length} 步`);
+  else fitView();
+}
+
+/* =========================================================
+   6. 岗位视角
+   ========================================================= */
+function renderRole(rid){
+  const r = ROLE[rid];
+  if(!r){ go('#/roles'); return; }
+  const fs = roleFlows(rid);
+  const total = fs.reduce((s,f)=>s+roleNodesIn(f,rid).length,0);
+  const sysSet = new Set();
+  fs.forEach(f=>roleNodesIn(f,rid).forEach(n=>{ if(n.system) sysSet.add(n.system); }));
+
+  const maxN = Math.max(...fs.map(f=>roleNodesIn(f,rid).length),1);
+  const bars = fs.map(f=>{
+    const c=roleNodesIn(f,rid).length;
+    return `<div class="barrow">
+      <div class="nm" title="${esc(f.name)}">${esc(f.name)}</div>
+      <div class="tr"><div class="fl" style="width:${c/maxN*100}%;background:${r.color||'#2563eb'}"></div></div>
+      <div class="vl">${c}</div>
+    </div>`;
+  }).join('');
+
+  const groups = fs.map(f=>{
+    const ns = roleNodesIn(f,rid).sort((a,b)=>curStep(f,a.id)-curStep(f,b.id));
+    return `<div class="groupbox">
+      <div class="gh" data-f="${f.id}">
+        <h4>${esc(f.name)}</h4>
+        ${f.role==='main'?'<span class="tag">主流程</span>':''}
+        <span class="n">${ns.length} 个动作 →</span>
+      </div>
+      <div class="steps">${ns.map((n,i)=>`
+        <div class="step" data-f="${f.id}" data-n="${n.id}">
+          <span class="no">${i+1}</span>
+          <div class="tx">${esc(n.text)}
+            <div class="sy">${esc((f.phases.find(p=>p.id===n.phase)||{}).name||'')}${n.system?' · '+esc(sysName(n.system)):''}</div>
+          </div>
+        </div>`).join('')}</div>
+    </div>`;
+  }).join('');
+
+  $('#v-role').innerHTML = `
+    <div class="rolehead">
+      <div class="avatar" style="background:${r.color||'#2563eb'}">${esc(r.name.slice(0,1))}</div>
+      <div>
+        <h1 class="page">${esc(r.name)}</h1>
+        <p class="lede" style="margin-top:5px">${r.dept?esc(deptName(r.dept))+' · ':''}
+        在 ${fs.length} 张流程里共承担 <b>${total}</b> 个动作，涉及 ${sysSet.size} 个系统。</p>
+      </div>
+    </div>
+    <div class="sect-head"><h3>分布</h3><span class="hint">按流程看这个人要做多少步</span></div>
+    <div class="bars">${bars}</div>
+    <div class="sect-head"><h3>逐条动作</h3><span class="hint">点任意一条跳到流程里的位置</span></div>
+    ${groups}
+  `;
+
+  $$('#v-role .step').forEach(s=>s.onclick=()=>{
+    trail = [];
+    go(`#/flow/${s.dataset.f}?n=${s.dataset.n}`);
+  });
+  $$('#v-role .gh').forEach(h=>h.onclick=()=>{ trail=[]; go(`#/flow/${h.dataset.f}`); });
+}
+function curStep(f,id){
+  try{ return layout(f).pos[id].step; }catch(e){ return 0; }
+}
+
+/* =========================================================
+   7. 一致性检查
+   ========================================================= */
+function renderIssues(){
+  const g = {error:[],warning:[],info:[]};
+  D.issues.forEach(i=>g[i.level].push(i));
+  const label = {error:'错误 · 会导致跳转失败', warning:'警告 · 业务口径待确认', info:'提示 · 可以不管'};
+
+  const block = lv => {
+    if(!g[lv].length) return '';
+    return `<div class="sect-head"><h3>${label[lv]}</h3><span class="hint">${g[lv].length} 条</span></div>
+      ${g[lv].map(i=>{
+        const flow = i.flow ? FLOW[i.flow] : null;
+        return `<div class="issue ${lv}" ${i.flow?`data-f="${i.flow}"`:''} ${i.node?`data-n="${i.node}"`:''}>
+          <div class="lv"></div>
+          <div class="bd">
+            <div class="hd"><b>${esc(i.title)}</b><span class="code">${esc(i.code)}</span>
+              ${flow?`<span class="loc">${esc(flow.name)}${i.node?' · '+esc(i.node):''}</span>`:''}</div>
+            <p>${esc(i.detail)}</p>
+          </div>
+          <span class="fix">›</span>
+        </div>`;
+      }).join('')}`;
+  };
+
+  const errs=g.error.length, warns=g.warning.length;
+  $('#v-issues').innerHTML = `
+    <h1 class="page">一致性检查</h1>
+    <p class="lede">${errs?`发现 ${errs} 处会导致流程走不通的问题，`:'没有断链，'}${warns?`另有 ${warns} 处口径不统一。`:'术语与职责都一致。'}
+    这些结论来自清单本身，改完 manifest 重新生成即可。</p>
+    ${block('error')}${block('warning')}${block('info')}
+    ${!D.issues.length?'<div class="empty">清单很干净，没有发现问题。</div>':''}
+  `;
+  $$('#v-issues .issue').forEach(el=>el.onclick=()=>{
+    if(!el.dataset.f) return;
+    trail=[];
+    go(`#/flow/${el.dataset.f}${el.dataset.n?'?n='+el.dataset.n:''}`);
+  });
+}
+
+/* =========================================================
+   8. 启动
+   ========================================================= */
+function boot(){
+  $('#brandTitle').textContent = D.meta.title || '流程工作台';
+  $('#brandSub').textContent = (D.meta.org?D.meta.org+' · ':'') + (D.meta.version?'v'+D.meta.version:'');
+
+  const tabs=[['home','总览'],['flows','流程索引'],['role',null],['issues','一致性检查']];
+  $('#nav').innerHTML = [['home','总览'],['flows','流程索引'],['role','岗位视角'],['issues','一致性检查']]
+    .map(([k,l])=>`<button data-k="${k}">${l}</button>`).join('');
+  $$('#nav button').forEach(b=>b.onclick=()=>{
+    if(b.dataset.k==='role'){ trail=[]; go(`#/role/${ROLES[0].id}`); }
+    else { trail=[]; go('#/'+b.dataset.k); }
+  });
+
+  $('#btnFit').onclick=fitView;
+  playBtn.onclick=()=>{ playTimer?stopPlay():startPlay(); };
+  addEventListener('keydown',ev=>{
+    if(ev.key==='Escape'){
+      $('#close').click();
+      if(playTimer) stopPlay();
+      if(trail.length) $('#btnBack').click();
+    }
+  });
+  addEventListener('resize',()=>{ if(mounted) apply(); });
+  addEventListener('hashchange',router);
+  router();
+}
+boot();
+</script>
+</body>
+</html>
