@@ -82,8 +82,8 @@ def validate(m: dict) -> list:
         if fid in seen_flow:
             fatal.append(f"流程 id 重复：{fid}")
         seen_flow.add(fid)
-        if not f.get("nodes"):
-            fatal.append(f"流程 {fid} 没有任何节点")
+        if not f.get("nodes") and not f.get("registry"):
+            fatal.append(f"流程 {fid} 没有任何节点（如属手册登记、暂无图形，请标 registry: true）")
         phase_ids = {p["id"] for p in f.get("phases") or []}
         for n in f.get("nodes") or []:
             nid = n.get("id")
@@ -95,8 +95,8 @@ def validate(m: dict) -> list:
             seen_node[nid] = fid
             if n.get("phase") not in phase_ids:
                 fatal.append(f"节点 {nid} 的 phase「{n.get('phase')}」不在流程 {fid} 的阶段表里")
-            if n.get("lane") and n["lane"] not in role_ids:
-                fatal.append(f"节点 {nid} 的 lane「{n['lane']}」不是已登记角色")
+            if n.get("lane") and n["lane"] not in role_ids and n["lane"] not in dept_ids:
+                fatal.append(f"节点 {nid} 的 lane「{n['lane']}」既不是已登记角色，也不是已登记部门")
         ids = {n.get("id") for n in f.get("nodes") or []}
         for e in f.get("edges") or []:
             for end in ("from", "to"):
@@ -214,14 +214,33 @@ def check(m: dict) -> list:
     # ---- 5. 自我审批：同一流程里，同一角色先提交后审批 ----
     for f in flows:
         nodes = f.get("nodes") or []
-        for i, a in enumerate(nodes):
+        by_id = {n.get("id"): n for n in nodes}
+        # 只沿真实连线往下找两跳，避免把顺序无关的两个节点误判成「先提后批」
+        adj = {}
+        for e in f.get("edges") or []:
+            adj.setdefault(e.get("from"), []).append(e.get("to"))
+        seen = set()
+        for a in nodes:
             if not any(w in str(a.get("text", "")) for w in SUBMIT_WORDS):
                 continue
-            for b in nodes[i + 1:]:
+            reach, frontier = [], [a.get("id")]
+            for _ in range(2):
+                nxt = []
+                for x in frontier:
+                    for y in adj.get(x, []):
+                        if y in by_id and y not in reach:
+                            reach.append(y)
+                            nxt.append(y)
+                frontier = nxt
+            for bid in reach:
+                b = by_id.get(bid) or {}
                 if a.get("role") != b.get("role"):
                     continue
                 if not any(w in str(b.get("text", "")) for w in APPROVE_WORDS):
                     continue
+                if (f["id"], bid) in seen:
+                    continue
+                seen.add((f["id"], bid))
                 add("warning", "SELF_APPROVE", f["id"], b["id"],
                     f"{roles.get(a.get('role'), {}).get('name', a.get('role'))} 自己提自己批",
                     f"「{a['text']}」与「{b['text']}」都由同一角色执行。"

@@ -174,6 +174,16 @@
   .toolbtn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
   .toolbtn svg{width:12px;height:12px}
 
+  .emptyflow{max-width:620px;margin:12vh auto 0;text-align:center;padding:0 28px}
+  .emptyflow .ef-tag{display:inline-block;font-size:12px;letter-spacing:.06em;color:#b45309;
+    background:#fffbeb;border:1px solid #fde68a;border-radius:99px;padding:4px 12px;margin-bottom:18px}
+  .emptyflow h2{font-size:26px;margin:0 0 8px;color:var(--ink)}
+  .emptyflow .ef-meta{color:var(--muted);font-size:13px;margin:0 0 22px}
+  .emptyflow .ef-sum{color:var(--ink-2);line-height:1.9;font-size:14px;margin:0 0 16px}
+  .emptyflow .ef-hint{color:var(--muted);font-size:13px;line-height:1.85;
+    border-top:1px dashed var(--line);padding-top:16px}
+  .reg-tag{display:inline-block;margin-left:8px;font-size:11px;font-weight:500;color:#b45309;
+    background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:1px 6px;vertical-align:middle}
   #laneBar{position:fixed;left:0;right:0;top:104px;height:32px;z-index:45;
     background:rgba(255,255,255,.95);border-bottom:1px solid var(--line);overflow:hidden;pointer-events:none}
   #laneBar i{position:absolute;top:0;height:32px;display:flex;align-items:center;justify-content:center;
@@ -402,6 +412,10 @@ const roleName = id => (ROLE[id]&&ROLE[id].name) || id || '—';
 const sysName  = id => (SYS[id]&&SYS[id].name) || id || '—';
 const deptName = id => (DEPT[id]&&DEPT[id].name) || id || '';
 const roleColor= id => (ROLE[id]&&ROLE[id].color) || '#64748b';
+/* 泳道既可以是岗位（v2.0 写法），也可以是部门（v2.1 写法），两套字典都认 */
+const laneName = id => (DEPT[id]&&DEPT[id].name) || roleName(id);
+const laneColor= id => (DEPT[id]&&DEPT[id].color) || roleColor(id);
+const laneIsDept = id => !!DEPT[id];
 
 const nodeCount = f => (f.nodes||[]).length;
 const flowRoles = f => [...new Set((f.nodes||[]).map(n=>n.role).filter(Boolean))];
@@ -420,7 +434,7 @@ function toast(msg){
    泳道定 x，步序定 y。回边（如"换货后重新到货"）先 DFS 标出来，
    不参与分层，否则会把下游节点的 y 推到无穷远。
    ========================================================= */
-const NW=206, NH=56, DEC_H=96, LANE_W=258, PAD_X=34, PAD_Y=48, GAP_Y=102;
+const NW=206, NH=56, DEC_H=96, LANE_W=258, PAD_X=34, PAD_Y=48, GAP_Y=118;
 const nodeH = n => n.type==='dec' ? DEC_H : NH;
 
 function layout(flow){
@@ -447,36 +461,38 @@ function layout(flow){
     if(step[e.to] < step[e.from]+1) step[e.to]=step[e.from]+1;
   });
 
-  /* ③ 定坐标 */
-  const pos={}, occupied={};
+  /* ③ 定坐标：同泳道同层的多个节点纵向顺延，绝不重叠 */
+  const pos={}, laneBottom={};
   let maxStep=0;
-  nodes.forEach(n=>{
+  [...nodes].sort((a,b)=>(step[a.id]||0)-(step[b.id]||0)).forEach(n=>{
     const li = laneIdx[n.lane]!=null ? laneIdx[n.lane] : 0;
     const s = step[n.id]||0;
     maxStep = Math.max(maxStep,s);
-    const key = li+':'+s;
-    const k = occupied[key]=(occupied[key]||0)+1;
-    pos[n.id] = {
-      x: PAD_X + LANE_W/2 + li*LANE_W + (k>1 ? (k-1)*34*(k%2?1:-1) : 0),
-      y: PAD_Y + s*GAP_Y + (k>1 ? (k-1)*30 : 0),
-      step: s
-    };
+    // 基准层位与泳道已有内容的底边取大者：同层顺延的节点永远不会撞上下一层
+    const y = Math.max(PAD_Y + s*GAP_Y, (laneBottom[li]||0) + 22);
+    laneBottom[li] = y + nodeH(n);
+    pos[n.id] = { x: PAD_X + LANE_W/2 + li*LANE_W, y, step: s };
   });
 
-  /* ④ 阶段带：按该阶段节点的 step 范围 */
+  /* ④ 阶段带：按该阶段节点实际 y 范围（同层顺延后不再按层数估） */
+  let cursor = PAD_Y - 40;
   const phases = (flow.phases||[]).map(p=>{
-    const ss = nodes.filter(n=>n.phase===p.id).map(n=>step[n.id]||0);
-    const a = ss.length ? Math.min(...ss) : 0, b = ss.length ? Math.max(...ss) : 0;
-    return {...p, y1: PAD_Y + a*GAP_Y - 40, y2: PAD_Y + b*GAP_Y + 42};
+    const ns = nodes.filter(n=>n.phase===p.id);
+    if(!ns.length) return {...p, y1: cursor, y2: cursor + 26};
+    const a = Math.min(...ns.map(n=>pos[n.id].y)), b = Math.max(...ns.map(n=>pos[n.id].y + nodeH(n)));
+    const band = {...p, y1: Math.min(cursor, a - 40), y2: b + 42};
+    cursor = band.y2;
+    return band;
   });
 
   const w = PAD_X*2 + lanes.length*LANE_W;
-  const h = PAD_Y*2 + maxStep*GAP_Y + 40;
+  const h = Math.max(PAD_Y*2 + maxStep*GAP_Y + 40,
+                     ...nodes.map(n=>pos[n.id].y + nodeH(n) + 60));
 
   return {
     pos, step, phases, back,
     lanes: lanes.map((rid,i)=>({
-      rid, name: roleName(rid), color: roleColor(rid),
+      rid, name: laneName(rid), color: laneColor(rid),
       x: PAD_X + i*LANE_W, w: LANE_W
     })),
     w, h
@@ -673,7 +689,8 @@ function renderIndex(){
     $('#cardbox').innerHTML = list.length ? `<div class="cards">${list.map(f=>{
       const hits = kw ? (f.nodes||[]).filter(n=>(n.text+' '+(n.note||'')).toLowerCase().includes(kw)) : [];
       return `<div class="fcard" data-f="${f.id}">
-        <h3>${esc(f.name)}${f.role==='main'?'<span class="main-tag">主流程</span>':''}</h3>
+        <h3>${esc(f.name)}${f.role==='main'?'<span class="main-tag">主流程</span>':''}${
+          nodeCount(f)?'':'<span class="reg-tag">未接入图形</span>'}</h3>
         <p>${esc(f.summary||'')}</p>
         <div class="meta">
           <span class="tag">${nodeCount(f)} 个动作</span>
@@ -737,6 +754,21 @@ function renderFlow(flowId, focusNode){
     curPhase=b.dataset.p; applyPhase();
   });
 
+  if(!(flow.nodes||[]).length){
+    canvas.innerHTML=''; wires.innerHTML='';
+    laneBar.innerHTML='';
+    const box=document.createElement('div');
+    box.className='emptyflow';
+    box.innerHTML = `<div class="ef-tag">未接入图形</div>
+      <h2>${esc(flow.name)}</h2>
+      <p class="ef-meta">${esc(deptName(flow.dept))}${flow.code?' · '+esc(flow.code):''}</p>
+      <p class="ef-sum">${esc(flow.summary||'本条流程仅有手册登记信息。')}</p>
+      <p class="ef-hint">它已经出现在流程索引与部门筛选里，可以按名称检索到；
+      补上源图（.vsdx / 表格 / 文字描述）后重新构建，就会自动并入画布与岗位统计。</p>`;
+    canvas.appendChild(box);
+    canvas.style.width='100%'; canvas.style.height='100%';
+    return;
+  }
   curLayout = layout(flow);
   renderCanvas(flow);
   requestAnimationFrame(()=>{
@@ -810,6 +842,7 @@ function renderCanvas(flow){
     const p=curLayout.pos[n.id];
     const el=document.createElement('div');
     el.className='node t-'+n.type;
+    el.dataset.id = n.id;
     el.style.left=(p.x-NW/2)+'px';
     el.style.top =(p.y-nodeH(n)/2)+'px';
     el.style.height=nodeH(n)+'px';
