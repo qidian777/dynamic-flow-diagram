@@ -95,8 +95,6 @@ def validate(m: dict) -> list:
             seen_node[nid] = fid
             if n.get("phase") not in phase_ids:
                 fatal.append(f"节点 {nid} 的 phase「{n.get('phase')}」不在流程 {fid} 的阶段表里")
-            if n.get("lane") and n["lane"] not in role_ids and n["lane"] not in dept_ids:
-                fatal.append(f"节点 {nid} 的 lane「{n['lane']}」既不是已登记角色，也不是已登记部门")
         ids = {n.get("id") for n in f.get("nodes") or []}
         for e in f.get("edges") or []:
             for end in ("from", "to"):
@@ -119,6 +117,8 @@ def check(m: dict) -> list:
     issues = []
     dicts = m.get("dictionaries") or {}
     roles = {r["id"]: r for r in dicts.get("roles") or []}
+    # 兜底角色（如「销售部经办」）是缺岗位说明时的占位，不代表真实分工，不参与职责类判定
+    fallback_roles = {rid for rid, r in roles.items() if r.get("fallback")}
     systems = {s["id"]: s for s in dicts.get("systems") or []}
     sys_names = {s["name"] for s in dicts.get("systems") or []}
     flows = m.get("flows") or []
@@ -152,7 +152,7 @@ def check(m: dict) -> list:
                 add("error", "BROKEN_SUBNODE", f["id"], n["id"],
                     f"指向 {tf} 中不存在的节点「{tn}」",
                     f"节点「{n['text']}」引用了 {tf}.{tn}，但该流程里没有这个节点。")
-            elif not tn:
+            elif not tn and flow_by_id[tf].get("nodes"):
                 add("info", "SUBFLOW_NO_ANCHOR", f["id"], n["id"],
                     "子流程未指定入口节点",
                     f"节点「{n['text']}」只引用了流程 {tf}，没指定落到哪个节点，"
@@ -236,6 +236,8 @@ def check(m: dict) -> list:
                 b = by_id.get(bid) or {}
                 if a.get("role") != b.get("role"):
                     continue
+                if a.get("role") in fallback_roles:
+                    continue
                 if not any(w in str(b.get("text", "")) for w in APPROVE_WORDS):
                     continue
                 if (f["id"], bid) in seen:
@@ -251,6 +253,8 @@ def check(m: dict) -> list:
     for f in flows:
         for n in f.get("nodes") or []:
             t = str(n.get("text", ""))
+            if n.get("role") in fallback_roles:
+                continue
             for w in ACTION_WORDS:
                 if w in t:
                     action_role.setdefault(w, {}).setdefault(n.get("role"), []).append((f, n))
@@ -320,9 +324,31 @@ def build_html(m: dict, issues: list) -> str:
     if PLACEHOLDER not in tpl:
         sys.exit(f"模板里缺少数据占位符 {PLACEHOLDER}")
 
+    # 泳道名不是登记部门时（原图常见「业务部门」「招聘专员/HRBP」这类参与方），
+    # 自动注册为外部泳道：保留原图泳道结构，但不进部门筛选器。
+    dicts = dict(m.get("dictionaries") or {})
+    depts = [dict(d) for d in dicts.get("departments") or []]
+    known = {d["id"] for d in depts} | {r["id"] for r in dicts.get("roles") or []}
+    palette = ["#0f766e", "#7c3aed", "#b45309", "#0369a1", "#be123c", "#4d7c0f",
+               "#a16207", "#9333ea", "#2563eb", "#c2410c"]
+
+    def reg_lane(name):
+        if not name or name in known:
+            return
+        known.add(name)
+        depts.append({"id": name, "name": name, "external": True,
+                      "color": palette[len(depts) % len(palette)]})
+
+    for f in m.get("flows") or []:
+        for lane in f.get("lanes") or []:
+            reg_lane(lane)
+        for n in f.get("nodes") or []:
+            reg_lane(n.get("lane"))
+    dicts["departments"] = depts
+
     payload = {
         "meta": m.get("meta") or {},
-        "dictionaries": m.get("dictionaries") or {},
+        "dictionaries": dicts,
         "terms": m.get("terms") or [],
         "flows": m.get("flows") or [],
         "issues": issues,

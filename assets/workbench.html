@@ -193,7 +193,7 @@
   #viewport.on{right:376px}
   #stage{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
   #canvas{position:relative}
-  #wires{position:absolute;inset:0;overflow:visible;pointer-events:none}
+  #wires{position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:2}
   #wires path{fill:none;stroke:#9aa8bd;stroke-width:1.5}
   #wires path.live{stroke:#e11d48;stroke-width:2.2}
   #wires path.hot{stroke:#2563eb;stroke-width:2}
@@ -639,7 +639,7 @@ function renderIndex(){
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input id="q" placeholder="搜流程名、说明或节点动作…" value="${esc(F.q)}">
       </div>
-      ${dropdown('dept','部门',(D.dictionaries.departments||[]).map(d=>[d.id,d.name]),counts.dept)}
+      ${dropdown('dept','部门',(D.dictionaries.departments||[]).filter(d=>!d.external).map(d=>[d.id,d.name]),counts.dept)}
       ${dropdown('role','角色',ROLES.map(r=>[r.id,r.name]),counts.role)}
       ${dropdown('sys','系统',(D.dictionaries.systems||[]).map(s=>[s.id,s.name]),counts.sys)}
       <button class="clear" id="clr">清空筛选</button>
@@ -940,6 +940,8 @@ function fitView(){
 function centerOn(id){
   const p=curLayout.pos[id]; if(!p) return;
   const box=vp.getBoundingClientRect();
+  // 定位到具体节点时，若当前缩放太小（大图 fitView 压得很扁），放大到可读档位
+  if(view.s < .62){ view.s = Math.min(.78, view.s * 2.6); }
   view.x=box.width/2 - p.x*view.s;
   view.y=box.height/2 - p.y*view.s;
   apply();
